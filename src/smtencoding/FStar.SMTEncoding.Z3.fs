@@ -23,7 +23,7 @@ open FStar
 open FStar.SMTEncoding.Term
 open FStar.BaseTypes
 open FStar.Util
-module Proof = FStar.SMTEncoding.Proofs
+module Proof = FStar.SMTEncoding.SMTSexpr
 module BU = FStar.Util
 
 (****************************************************************************)

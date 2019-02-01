@@ -12,6 +12,8 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>smtencoding</Name>
     <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -51,11 +53,28 @@
     </Otherwise>
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
+  <Import Project="..\VS\packages\FsLexYacc.6.1.0\build\FsLexYacc.targets" Condition="Exists('..\VS\packages\FsLexYacc.6.1.0\build\FsLexYacc.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\VS\packages\FsLexYacc.6.1.0\build\FsLexYacc.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\VS\packages\FsLexYacc.6.1.0\build\FsLexYacc.targets'))" />
+  </Target>
   <ItemGroup>
     <Compile Include="FStar.SMTEncoding.Term.fsi" />
     <Compile Include="FStar.SMTEncoding.Term.fs" />
     <Compile Include="FStar.SMTEncoding.Util.fs" />
-    <Compile Include="Proofs\FStar.SMTEncoding.Proofs.fs" />
+    <FsYacc Include="FStar.SMTEncoding.SMTParser.fsp">
+      <OtherFlags>--module FStar.SMTEncoding.SMTParser --open FStar.SMTEncoding.SMTSexpr</OtherFlags>
+    </FsYacc>
+    <Compile Include="FStar.SMTEncoding.SMTSexpr.fs" />
+    <Compile Include="FStar.SMTEncoding.SMTParser.fsi" />
+    <Compile Include="FStar.SMTEncoding.SMTParser.fs" />
+    <FsLex Include="FStar.SMTEncoding.SMTLexer.fss">
+      <OtherFlags>--unicode</OtherFlags>
+    </FsLex>
+    <Compile Include="FStar.SMTEncoding.SMTLexer.fs" />
+    <Compile Include="FStar.SMTEncoding.SMTRead.fs" />
     <Compile Include="FStar.SMTEncoding.Z3.fsi" />
     <Compile Include="FStar.SMTEncoding.Z3.fs" />
     <Compile Include="FStar.SMTEncoding.ErrorReporting.fsi" />
