@@ -110,15 +110,16 @@ let check_z3hash () =
 
 let ini_params () =
   check_z3hash ();
-  List.append ["-smt2";
-               "-in";
-               Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))]
-              (Options.z3_cliopt ())
+  let args : list<string> = ["-smt2"; "-in"; Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))] in
+  let opts : list<string> = Options.z3_cliopt () in
+  let proof : list<string> = if Options.analyze_proof () then ["proof=true"] else [] in
+  args @ opts @ proof
 
 type label = string
 type unsat_core = option<list<string>>
+type refutation  = option<list<string>>
 type z3status =
-    | UNSAT   of unsat_core
+    | UNSAT   of unsat_core * refutation
     | SAT     of error_labels * option<string>         //error labels
     | UNKNOWN of error_labels * option<string>         //error labels
     | TIMEOUT of error_labels * option<string>         //error labels
@@ -132,7 +133,7 @@ let status_tag = function
     | TIMEOUT _ -> "timeout"
     | KILLED -> "killed"
 
-let status_string_and_errors s =
+let status_string_and_errors s = // : z3status * list<error_label>
     match s with
     | KILLED
     | UNSAT _ -> status_tag s, []
@@ -159,7 +160,7 @@ type query_log = {
 }
 
 
-let query_logging =
+let query_logging = // : query_log
     let query_number = BU.mk_ref 0 in
     let log_file_opt : ref<option<file_handle>> = BU.mk_ref None in
     let used_file_names : ref<list<(string * int)>> = BU.mk_ref [] in
@@ -221,7 +222,7 @@ let query_logging =
       close_log=close_log;
       log_file_name=log_file_name}
 
-let bg_z3_proc =
+let bg_z3_proc = // : ref<bgproc>     (should this really be a ref?)
     let the_z3proc = BU.mk_ref None in
     let new_proc =
         let ctr = BU.mk_ref (-1) in
@@ -261,10 +262,13 @@ type smt_output = {
   smt_unsat_core:     option<smt_output_section>;
   smt_statistics:     option<smt_output_section>;
   smt_labels:         option<smt_output_section>;
+  smt_refutation:     option<smt_output_section>;
 }
 
 let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
-    let rec until tag lines =
+    // until tag lines returns None if tag is not one of the lines,
+    // or Some(prefix ,suffix) where prefix are the lines before the tag, and suffix the lines after the tag
+    let rec until (tag : string) (lines : list<string>) : option<list<string> * list<string>> =
         match lines with
         | [] -> None
         | l::lines ->
@@ -274,6 +278,11 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
     in
     let start_tag tag = "<" ^ tag ^ ">" in
     let end_tag tag = "</" ^ tag ^ ">" in
+    // find_section tag lines extracts from lines the section contained between
+    // the first <tag> line and the first subsequent </tag> line, as well as the rest of lines.
+    // the output is (Some(section) , rest) if such a section is found
+    // (None, rest) if <tag> is not found
+    // and a failure if <tag> is found but no subsequent </tag> is found
     let find_section tag lines : option<(list<string>)> * list<string> =
        match until (start_tag tag) lines with
        | None -> None, lines
@@ -286,6 +295,12 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
     let result = BU.must result_opt in
     let reason_unknown, lines = find_section "reason-unknown" lines in
     let unsat_core, lines = find_section "unsat-core" lines in
+    let refutation, lines = 
+        if Options.analyze_proof () then
+            find_section "proof" lines
+        else
+            None , lines
+    in
     let statistics, lines = find_section "statistics" lines in
     let labels, lines = find_section "labels" lines in
     let remaining =
@@ -304,13 +319,14 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
      smt_reason_unknown = reason_unknown;
      smt_unsat_core = unsat_core;
      smt_statistics = statistics;
-     smt_labels = labels}
+     smt_labels = labels;
+     smt_refutation = refutation}
 
 let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_labels) : z3status * z3statistics =
   let parse (z3out:string) =
     let lines = String.split ['\n'] z3out |> List.map BU.trim_string in
-    let smt_output = smt_output_sections r lines in
-    let unsat_core =
+    let smt_output : smt_output = smt_output_sections r lines in
+    let unsat_core : unsat_core =
         match smt_output.smt_unsat_core with
         | None -> None
         | Some s ->
@@ -320,6 +336,7 @@ let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_la
           then None
           else Some (BU.split s " " |> BU.sort_with String.compare)
     in
+    let unsat_proof : refutation = smt_output.smt_refutation in
     let labels =
         match smt_output.smt_labels with
         | None -> []
@@ -365,7 +382,7 @@ let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_la
     let status =
       if Options.debug_any() then print_string <| format1 "Z3 says: %s\n" (String.concat "\n" smt_output.smt_result);
       match smt_output.smt_result with
-      | ["unsat"]   -> UNSAT unsat_core
+      | ["unsat"]   -> UNSAT (unsat_core , unsat_proof)
       | ["sat"]     -> SAT     (labels, reason_unknown)
       | ["unknown"] -> UNKNOWN (labels, reason_unknown)
       | ["timeout"] -> TIMEOUT (labels, reason_unknown)
@@ -406,7 +423,8 @@ type z3result = {
       z3result_status      : z3status;
       z3result_time        : int;
       z3result_statistics  : z3statistics;
-      z3result_query_hash  : option<string>
+      z3result_query_hash  : option<string> ;
+      z3result_query_decls : list<decl> ;
 }
 
 type z3job = job_t<z3result>
@@ -415,7 +433,7 @@ let job_queue : ref<list<z3job>> = BU.mk_ref []
 
 let pending_jobs = BU.mk_ref 0
 
-let z3_job (r:Range.range) fresh (label_messages:error_labels) input qhash () : z3result =
+let z3_job (r:Range.range) fresh (label_messages:error_labels) input (decls : list<decl>) qhash () : z3result =
   let start = BU.now() in
   let status, statistics =
     try doZ3Exe r fresh input label_messages
@@ -427,7 +445,8 @@ let z3_job (r:Range.range) fresh (label_messages:error_labels) input qhash () : 
   { z3result_status     = status;
     z3result_time       = elapsed_time;
     z3result_statistics = statistics;
-    z3result_query_hash = qhash }
+    z3result_query_hash = qhash ;
+    z3result_query_decls = decls }
 
 let running = BU.mk_ref false
 
@@ -487,6 +506,9 @@ let finish () =
 
 type scope_t = list<list<decl>>
 
+let collect (scope : scope_t) =
+  List.fold_right (fun x y -> (List.rev x) @ y) scope []
+
 // bg_scope is a global, mutable variable that keeps a list of the declarations
 // that we have given to z3 so far. In order to allow rollback of history,
 // one can enter a new "scope" by pushing a new, empty z3 list of declarations
@@ -505,12 +527,12 @@ let bg_scope : ref<list<decl>> = BU.mk_ref []
 // then, givez3 modifies the reference so that within the new list at the front,
 // new queries are pushed
 let push msg    = BU.atomically (fun () ->
-    fresh_scope := [Caption msg; Push]::!fresh_scope;
-    bg_scope := !bg_scope @ [Push; Caption msg])
+    fresh_scope := [Caption msg; Push]::!fresh_scope;   // prepends the list [Caption msg , Push] in fresh_scope. This becomes the new "active" list in the stack
+    bg_scope := !bg_scope @ [Push; Caption msg])        // appends the elements Push and Caption msg into bg_scope
 
 let pop msg      = BU.atomically (fun () ->
-    fresh_scope := List.tl !fresh_scope;
-    bg_scope := !bg_scope @ [Caption msg; Pop])
+    fresh_scope := List.tl !fresh_scope;                // drop the last stage in the stack.
+    bg_scope := !bg_scope @ [Caption msg; Pop])         // append the elements Caption msg and Pop
 
 let snapshot msg = Common.snapshot push fresh_scope msg
 let rollback msg depth = Common.rollback (fun () -> pop msg) fresh_scope depth
@@ -534,7 +556,7 @@ let refresh () =
         (!bg_z3_proc).refresh();
         bg_scope := List.flatten (List.rev !fresh_scope)
 
-let mk_input theory =
+let mk_input theory : string * option<string> =
     let options = !z3_options in
     let r, hash =
         if Options.record_hints()
@@ -577,17 +599,19 @@ type cb = z3result -> unit
 let cache_hit
     (cache:option<string>)
     (qhash:option<string>)
-    (cb:cb) =
+    (cb:cb) 
+    (decls : list<decl>) =
     if Options.use_hints() && Options.use_hint_hashes() then
         match qhash with
         | Some (x) when qhash = cache ->
             let stats : z3statistics = BU.smap_create 0 in
             smap_add stats "fstar_cache_hit" "1";
             let result = {
-              z3result_status = UNSAT None;
+              z3result_status = UNSAT (None , None);
               z3result_time = 0;
               z3result_statistics = stats;
-              z3result_query_hash = qhash
+              z3result_query_hash = qhash;
+              z3result_query_decls = decls;
             } in
             cb result;
             true
@@ -606,9 +630,14 @@ let ask_1_core
   = let theory = !bg_scope@[Push]@qry@[Pop] in
     let theory, used_unsat_core = filter_theory theory in
     let input, qhash = mk_input theory in
+    // let qdecls = (collect (!fresh_scope))@qry in
     bg_scope := [] ; // Now consumed.
-    if not (cache_hit cache qhash cb) then
-        run_job ({job=z3_job r false label_messages input qhash; callback=cb})
+    // if not (cache_hit cache qhash cb qdecls) then
+        // run_job ({job=z3_job r false label_messages input qdecls qhash; callback=cb})
+    if not (cache_hit cache qhash cb []) then
+        run_job ({job=z3_job r false label_messages input [] qhash; callback=cb})
+
+// for now proof analysis only works for single-core
 
 let ask_n_cores
     (r:Range.range)
@@ -625,8 +654,8 @@ let ask_n_cores
     let theory = theory@[Push]@qry@[Pop] in
     let theory, used_unsat_core = filter_theory theory in
     let input, qhash = mk_input theory in
-    if not (cache_hit cache qhash cb) then
-        enqueue ({job=z3_job r true label_messages input qhash; callback=cb})
+    if not (cache_hit cache qhash cb []) then
+        enqueue ({job=z3_job r true label_messages input [] qhash; callback=cb})
 
 let ask
     (r:Range.range)

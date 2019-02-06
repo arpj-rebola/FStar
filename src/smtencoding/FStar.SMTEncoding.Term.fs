@@ -148,6 +148,7 @@ type decl =
   | Pop
   | CheckSat
   | GetUnsatCore
+  | GetProof
   | SetOption  of string * string
   | GetStatistics
   | GetReasonUnknown
@@ -200,7 +201,7 @@ let op_to_string = function
   | Not -> "not"
   | And -> "and"
   | Or  -> "or"
-  | Imp -> "implies"
+  | Imp -> "=>"
   | Iff -> "iff"
   | Eq  -> "="
   | LT  -> "<"
@@ -786,6 +787,7 @@ let rec declToSmt' print_captions z3options decl =
     ""
   | CheckSat -> "(echo \"<result>\")\n(check-sat)\n(echo \"</result>\")"
   | GetUnsatCore -> "(echo \"<unsat-core>\")\n(get-unsat-core)\n(echo \"</unsat-core>\")"
+  | GetProof -> "(echo \"<proof>\")\n(get-proof)\n(echo \"</proof>\")"
   | Push -> "(push)"
   | Pop -> "(pop)"
   | SetOption (s, v) -> format2 "(set-option :%s %s)" s v

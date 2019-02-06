@@ -120,6 +120,7 @@ type decl =
   | Pop
   | CheckSat
   | GetUnsatCore
+  | GetProof
   | SetOption  of string * string
   | GetStatistics
   | GetReasonUnknown

@@ -218,7 +218,8 @@ let with_fuel_and_diagnostics settings label_assumptions =
         Term.CheckSat; //go Z3!
         Term.GetReasonUnknown //explain why it failed
     ]
-    @(if Options.record_hints()        then [Term.GetUnsatCore]  else []) //unsat core is the recorded hint
+    @(if Options.record_hints() || Options.analyze_proof() then [Term.GetUnsatCore]  else []) //unsat core is the recorded hint
+    @(if Options.analyze_proof() then [Term.GetProof]  else [])
     @(if Options.print_z3_statistics() then [Term.GetStatistics] else []) //stats
     @settings.query_suffix //recover error labels and a final "Done!" message
 
@@ -336,7 +337,7 @@ let query_info settings z3result =
                 BU.string_of_int settings.query_fuel;
                 BU.string_of_int settings.query_ifuel;
                 BU.string_of_int settings.query_rlimit;
-                stats ];
+                stats ] ;
         errs |> List.iter (fun (_, msg, range) ->
             let tag = if used_hint settings then "(Hint-replay failed): " else "" in
             FStar.Errors.log_issue range (FStar.Errors.Warning_HitReplayFailed, (tag ^ msg)))
@@ -353,7 +354,7 @@ let record_hint settings z3result =
                   unsat_core=core;
                   query_elapsed_time=0; //recording the elapsed_time prevents us from reaching a fixed point
                   hash=(match z3result.z3result_status with
-                        | UNSAT core -> z3result.z3result_query_hash
+                        | UNSAT (core , proof) -> z3result.z3result_query_hash
                         | _ -> None)
           }
       in
@@ -363,10 +364,10 @@ let record_hint settings z3result =
           | _ -> assert false; ()
       in
       match z3result.z3result_status with
-      | UNSAT None ->
+      | UNSAT (None , _) ->
         // we succeeded by just matching a query hash
         store_hint (Option.get (get_hint_for settings.query_name settings.query_index))
-      | UNSAT unsat_core ->
+      | UNSAT (unsat_core , _)->
         if used_hint settings //if we already successfully use a hint
         then //just re-use the successful hint, but record the hash of the pruned theory
              store_hint (mk_hint settings.query_hint)
@@ -374,12 +375,26 @@ let record_hint settings z3result =
       | _ ->  () //the query failed, so nothing to do
     end
 
+let proof_analysis (r : z3result) : unit =
+    if Options.analyze_proof () then
+        match r.z3result_status with
+            | UNSAT (Some core , Some proof_lines) ->
+                begin
+                let query_decls = r.z3result_query_decls in
+                BU.print "placeholder proof analysis\n" []
+                end
+            | UNSAT (_ , _) ->
+                BU.print "No proof was generated; nothing to analyze\n" []
+            | _ -> ()
+
+
 let process_result settings result : option<errors> =
     if used_hint settings && not (Options.z3_refresh()) then Z3.refresh();
     let errs = query_errors settings result in
     query_info settings result;
     record_hint settings result;
     detail_hint_replay settings result;
+    proof_analysis result ;
     errs
 
 let fold_queries (qs:list<query_settings>)
@@ -526,7 +541,6 @@ let solve use_env_msg tcenv q : unit =
     | Assume _ ->
         ask_and_report_errors tcenv labels prefix qry suffix;
         pop ()
-
     | _ -> failwith "Impossible"
 
 (**********************************************************************************************)

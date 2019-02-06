@@ -24,10 +24,12 @@ open FStar.BaseTypes
 open FStar.Util
 module BU = FStar.Util
 
+// type unsat_core = option<list<string>>
 type unsat_core = option<list<string>>
+type refutation = option<list<string>>
 type scope_t = list<list<decl>>
 type z3status =
-    | UNSAT   of unsat_core
+    | UNSAT   of unsat_core * refutation
     | SAT     of error_labels * option<string>         //error labels * z3 reason
     | UNKNOWN of error_labels * option<string>         //error labels * z3 reason
     | TIMEOUT of error_labels * option<string>         //error labels * z3 reason
@@ -40,7 +42,8 @@ type z3result = {
       z3result_status      : z3status;
       z3result_time        : int;
       z3result_statistics  : z3statistics;
-      z3result_query_hash  : option<string>
+      z3result_query_hash  : option<string>;
+      z3result_query_decls : list<decl> ;
 }
 type cb = z3result -> unit
 val giveZ3 : list<decl> -> unit
