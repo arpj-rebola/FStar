@@ -132,6 +132,7 @@ type decl =
   | FuelDeclaration
   | SortDeclaration of string
   | DefPrelude
+  | GenerateOptions
   | DeclFun    of string * list<sort> * sort * caption
   | DefineFun  of string * list<sort> * sort * term * caption
   | Assume     of assumption
@@ -743,6 +744,7 @@ let rec declToSmt' (print_captions : bool) (z3options : string) (decl : decl) : 
   | SortDeclaration s -> "(declare-sort " ^ s ^ ")"
   | DefPrelude ->
     mkPrelude z3options
+  | GenerateOptions -> z3options
   | Module (s, decls) ->
     let res : string = List.map (declToSmt' print_captions z3options) decls |> String.concat "\n" in
     if Options.keep_query_captions()
@@ -985,17 +987,19 @@ let dataPrelude : list<decl> =
         DeclFun ("FString_constr_id" , [String_sort] , Int_sort , None) ;
         SortDeclaration "Term" ;
         DeclFun ("Term_constr_id" , [Term_sort] , Int_sort , None) ;
+        FuelDeclaration ;
         DeclFun ("MaxIFuel" , [] , Fuel_sort , None) ;
         DeclFun ("MaxFuel" , [] , Fuel_sort , None) ;
         DeclFun ("PreType" , [Term_sort] , Term_sort , None) ;
         DeclFun ("Valid" , [Term_sort] , Bool_sort , None) ;
         DeclFun ("HasTypeFuel" , [Fuel_sort ; Term_sort ; Term_sort] , Bool_sort , None) ;
-        DefineFun ("HasTypeZ" , [Term_sort ; Term_sort] , Term_sort , hastypez , None) ;
-        DefineFun ("HasType" , [Term_sort ; Term_sort] , Term_sort , hastype , None) ;
+        DefineFun ("HasTypeZ" , [Term_sort ; Term_sort] , Bool_sort , hastypez , None) ;
+        DefineFun ("HasType" , [Term_sort ; Term_sort] , Bool_sort , hastype , None) ;
         Assume {assumption_name=escape "fuel_irrelevance" ; assumption_caption=Some "Fuel irrelevance" ; assumption_term=fuelirrelevance ; assumption_fact_ids=[]} ;
         DeclFun ("NoHoist" , [Term_sort ; Bool_sort] , Bool_sort , None) ;
         Assume {assumption_name=escape "no_hoist" ; assumption_caption=Some "No-hoist" ; assumption_term=nohoist ; assumption_fact_ids=[]} ;
-        DefineFun ("ApplyTF" , [Term_sort ; Fuel_sort] , Term_sort , istyped , None) ;
+        DefineFun ("IsTyped" , [Term_sort] , Bool_sort , istyped , None) ;
+        DeclFun ("ApplyTF" , [Term_sort ; Fuel_sort] , Term_sort , None) ;
         DeclFun ("ApplyTT" , [Term_sort ; Term_sort] , Term_sort , None) ;
         DeclFun ("Rank" , [Term_sort] , Int_sort , None) ;
         DeclFun ("Closure" , [Term_sort] , Term_sort , None) ;

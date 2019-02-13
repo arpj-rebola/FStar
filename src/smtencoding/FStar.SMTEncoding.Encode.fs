@@ -1366,6 +1366,7 @@ let init tcenv =
     init_env tcenv;
     Z3.init ();
     Z3.giveZ3 [DefPrelude]
+    // Z3.giveZ3 (GenerateOptions::dataPrelude)
 let snapshot msg = BU.atomically (fun () ->
     let env_depth, () = snapshot_env () in
     let varops_depth, () = varops.snapshot () in

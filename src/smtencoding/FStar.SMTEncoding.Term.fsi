@@ -110,6 +110,7 @@ type decl =
   | FuelDeclaration
   | SortDeclaration of string
   | DefPrelude
+  | GenerateOptions
   | DeclFun    of string * list<sort> * sort * caption
   | DefineFun  of string * list<sort> * sort * term * caption
   | Assume     of assumption
@@ -200,6 +201,7 @@ val constructor_to_decl: Range.range -> constructor_t -> decls_t
 val mkBvConstructor: int -> decls_t
 val declToSmt: string -> decl -> string
 val declToSmt_no_caps: string -> decl -> string
+val dataPrelude : list<decl>
 
 val mk_Term_app : term -> term -> Range.range -> term
 val mk_Term_uvar: int -> Range.range -> term
