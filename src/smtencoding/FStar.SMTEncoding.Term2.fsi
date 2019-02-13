@@ -107,8 +107,6 @@ type assumption = {
     assumption_fact_ids:list<fact_db_id>
 }
 type decl =
-  | FuelDeclaration
-  | SortDeclaration of string
   | DefPrelude
   | DeclFun    of string * list<sort> * sort * caption
   | DefineFun  of string * list<sort> * sort * term * caption
