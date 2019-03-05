@@ -141,7 +141,7 @@ let rec extract_quantifiers_from_decls (query : query_info) (decl : decl) : list
                         quantifier_info_query = query ;
                         quantifier_info_quantifier = tm ;
                         quantifier_info_context = context }) :: (aux t)
-                | None -> print "No QID found" [] ; (aux t)
+                | None -> failwith "No QID found" []
             end
             | Let (tms , t) -> (aux t) @ (List.collect aux tms)
             | Labeled (t , _ , _)
@@ -205,7 +205,7 @@ let tabular_profile (q : psmap<qiprofile>) : list<(list<string>)> =
         let prof : qiprofile = must (psmap_try_find q k) in
         if prof.qiprofile_instances > 0 then
             match prof.qiprofile_quantifiers with
-                | [] -> print "QID not found" [] ; []
+                | [] -> failwith "QID not found" []
                 | hd :: tl ->
                     o @ ([ prof.qiprofile_id ;
                             string_of_int (prof.qiprofile_instances) ;
