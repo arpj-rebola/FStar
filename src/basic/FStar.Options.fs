@@ -1136,7 +1136,7 @@ let rec specs_with_types () : list<(char * string * opt_type * string)> =
        ( noshort,
         "analyze_proof",
         Const (mk_bool true),
-        "Analyzes proofs obtained from Z3") ]
+        "Analyzes proofs and quantifier instantiations obtained from Z3") ]
 
 and specs () : list<FStar.Getopt.opt> = // FIXME: Why does the interactive mode log the type of opt_specs_with_types as a triple??
   List.map (fun (short, long, typ, doc) ->

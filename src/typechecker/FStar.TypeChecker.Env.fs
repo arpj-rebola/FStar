@@ -370,22 +370,22 @@ let rollback solver msg depth = BU.atomically (fun () ->
 let push env msg = snd (snapshot env msg)
 let pop env msg = rollback env.solver msg None
 
-let incr_query_index env =
+let incr_query_index (env' : env) : env =
   let qix = peek_query_indices () in
-  match env.qtbl_name_and_index with
-  | _, None -> env
+  match env'.qtbl_name_and_index with
+  | _, None -> env'
   | tbl, Some (l, n) ->
     match qix |> List.tryFind (fun (m, _) -> Ident.lid_equals l m) with
     | None ->
       let next = n + 1 in
       add_query_index (l, next);
       BU.smap_add tbl l.str next;
-      {env with qtbl_name_and_index=tbl, Some (l, next)}
+      {env' with qtbl_name_and_index=tbl, Some (l, next)}
     | Some (_, m) ->
       let next = m + 1 in
       add_query_index (l, next);
       BU.smap_add tbl l.str next;
-      {env with qtbl_name_and_index=tbl, Some (l, next)}
+      {env' with qtbl_name_and_index=tbl, Some (l, next)}
 
 ////////////////////////////////////////////////////////////
 // Checking the per-module debug level and position info  //
@@ -1664,18 +1664,18 @@ let new_implicit_var_aux reason r env k should_check meta =
 
 (***************************************************)
 
-(* <Move> this out of here *)
-let dummy_solver = {
-    init=(fun _ -> ());
-    push=(fun _ -> ());
-    pop=(fun _ -> ());
-    snapshot=(fun _ -> (0, 0, 0), ());
-    rollback=(fun _ _ -> ());
-    encode_sig=(fun _ _ -> ());
-    encode_modul=(fun _ _ -> ());
-    preprocess=(fun e g -> [e,g, FStar.Options.peek ()]);
-    solve=(fun _ _ _ -> ());
-    finish=(fun () -> ());
-    refresh=(fun () -> ());
-}
-(* </Move> *)
+// (* <Move> this out of here *)
+// let dummy_solver = {
+//     init=(fun _ -> ());
+//     push=(fun _ -> ());
+//     pop=(fun _ -> ());
+//     snapshot=(fun _ -> (0, 0, 0), ());
+//     rollback=(fun _ _ -> ());
+//     encode_sig=(fun _ _ -> ());
+//     encode_modul=(fun _ _ -> ());
+//     preprocess=(fun e g -> [e,g, FStar.Options.peek ()]);
+//     solve=(fun _ _ _ -> ());
+//     finish=(fun () -> ());
+//     refresh=(fun () -> ());
+// }
+// (* </Move> *)

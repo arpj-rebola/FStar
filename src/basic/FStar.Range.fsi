@@ -25,6 +25,7 @@ type range
 type pos
 
 val dummyRange: range
+val preludeRange : range
 val use_range: range -> rng
 val def_range: range -> rng
 val range_of_rng: def_rng:rng -> use_rng:rng -> range
@@ -34,6 +35,7 @@ val mk_pos: int -> int -> pos
 val mk_range: string -> pos -> pos -> range
 val union_ranges: range -> range -> range
 val rng_included: rng -> rng -> bool
+val string_of_pos: pos -> string
 val string_of_range: range -> string
 val string_of_def_range: range -> string
 val string_of_use_range: range -> string

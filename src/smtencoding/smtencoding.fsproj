@@ -75,6 +75,8 @@
     </FsLex>
     <Compile Include="FStar.SMTEncoding.SMTLexer.fs" />
     <Compile Include="FStar.SMTEncoding.SMTRead.fs" />
+    <Compile Include="FStar.SMTEncoding.Analysis.fsi" />
+    <Compile Include="FStar.SMTEncoding.Analysis.fs" />
     <Compile Include="FStar.SMTEncoding.Z3.fsi" />
     <Compile Include="FStar.SMTEncoding.Z3.fs" />
     <Compile Include="FStar.SMTEncoding.ErrorReporting.fsi" />

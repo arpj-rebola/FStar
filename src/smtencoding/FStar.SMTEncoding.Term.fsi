@@ -80,7 +80,7 @@ type term' =
   | BoundV     of int
   | FreeV      of fv
   | App        of op  * list<term>
-  | Quant      of qop * list<list<pat>> * option<int> * list<sort> * term
+  | Quant      of qop * list<list<pat>> * option<int> * list<sort> * term * Syntax.memo<string>
   | Let        of list<term> * term
   | Labeled    of term * string * Range.range
   | LblPos     of term * string
@@ -111,6 +111,7 @@ type decl =
   | SortDeclaration of string
   | DefPrelude
   | GenerateOptions
+  | Hardcoded  of string
   | DeclFun    of string * list<sort> * sort * caption
   | DefineFun  of string * list<sort> * sort * term * caption
   | Assume     of assumption
@@ -132,6 +133,7 @@ type decls_t = list<decl>
 type error_label = (fv * string * Range.range)
 type error_labels = list<error_label>
 
+val assign_qids : decl -> unit
 val escape: string -> string
 val abstr: list<fv> -> term -> term
 val inst: list<term> -> term -> term
@@ -193,7 +195,7 @@ val mkExists: Range.range -> (list<list<pat>> * fvs * term) -> term
 val mkLet: (list<term> * term) -> Range.range -> term
 val mkLet': (list<(fv * term)> * term) -> Range.range -> term
 
-val fresh_token: (string * sort) -> int -> decl
+val fresh_token: Range.range -> (string * sort) -> int -> decl
 val injective_constructor : Range.range -> (string * list<constructor_field> * sort) -> decls_t
 val fresh_constructor : Range.range -> (string * list<sort> * sort * int) -> decl
 //val constructor_to_decl_aux: bool -> constructor_t -> decls_t
@@ -201,7 +203,7 @@ val constructor_to_decl: Range.range -> constructor_t -> decls_t
 val mkBvConstructor: int -> decls_t
 val declToSmt: string -> decl -> string
 val declToSmt_no_caps: string -> decl -> string
-val dataPrelude : list<decl>
+val preludeDecls : list<decl>
 
 val mk_Term_app : term -> term -> Range.range -> term
 val mk_Term_uvar: int -> Range.range -> term

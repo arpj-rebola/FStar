@@ -49,10 +49,19 @@ let dummy_pos = {
   line=0;
   col=0;
 }
+let prelude_rng : rng = {
+  file_name="<prelude>";
+  start_pos=dummy_pos;
+  end_pos=dummy_pos
+}
 let dummy_rng = {
   file_name="<dummy>";
   start_pos=dummy_pos;
   end_pos=dummy_pos
+}
+let preludeRange = {
+  def_range=prelude_rng;
+  use_range=prelude_rng
 }
 let dummyRange = {
   def_range=dummy_rng;

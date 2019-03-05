@@ -21,9 +21,10 @@ open FStar.Exn
 open FStar.All
 open FStar
 open FStar.SMTEncoding.Term
+open FStar.SMTEncoding.Analysis
 open FStar.BaseTypes
 open FStar.Util
-module Proof = FStar.SMTEncoding.SMTSexpr
+// module Proof = FStar.SMTEncoding.SMTSexpr
 module BU = FStar.Util
 
 (****************************************************************************)
@@ -39,7 +40,7 @@ let _z3hash_expected = "1f29cebd4df6"
 
 let _z3url = "https://github.com/FStarLang/binaries/tree/master/z3-tested"
 
-let parse_z3_version_lines out =
+let parse_z3_version_lines (out : string) : option<string> =
     match splitlines out with
     | x :: _ ->
         begin
@@ -76,7 +77,7 @@ let parse_z3_version_lines out =
         end
     | _ -> Some "No Z3 version string found"
 
-let z3hash_warning_message () =
+let z3hash_warning_message () : option<(FStar.Errors.raw_error * string)> =
     let run_proc_result =
         try
             Some (BU.run_process "z3_version" (Options.z3_exe()) ["-version"] None)
@@ -90,7 +91,7 @@ let z3hash_warning_message () =
         | Some msg -> Some (FStar.Errors.Warning_Z3InvocationWarning, msg)
         end
 
-let check_z3hash () =
+let check_z3hash () : unit =
     if not !_z3hash_checked
     then begin
         _z3hash_checked := true;
@@ -108,11 +109,11 @@ let check_z3hash () =
           FStar.Errors.log_issue Range.dummyRange (e, msg)
     end
 
-let ini_params () =
-  check_z3hash ();
+let ini_params () : list<string> =
+  check_z3hash () ;
   let args : list<string> = ["-smt2"; "-in"; Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))] in
   let opts : list<string> = Options.z3_cliopt () in
-  let proof : list<string> = if Options.analyze_proof () then ["proof=true"] else [] in
+  let proof : list<string> = if Options.analyze_proof () then ["proof=true" ; "smt.qi.profile=true"] else [] in
   args @ opts @ proof
 
 type label = string
@@ -124,133 +125,183 @@ type z3status =
     | UNKNOWN of error_labels * option<string>         //error labels
     | TIMEOUT of error_labels * option<string>         //error labels
     | KILLED
+
+// type qi_info = {
+//     instances       : int ;
+//     max_generation  : int ;
+//     max_cost        : int }
+
+// type qi_profile = psmap<qi_info>
+
 type z3statistics = BU.smap<string>
 
-let status_tag = function
+let status_tag : z3status -> string = function
     | SAT  _ -> "sat"
     | UNSAT _ -> "unsat"
     | UNKNOWN _ -> "unknown"
     | TIMEOUT _ -> "timeout"
     | KILLED -> "killed"
 
-let status_string_and_errors s = // : z3status * list<error_label>
-    match s with
+let status_string_and_errors (s : z3status) : string * list<error_label> = match s with
     | KILLED
-    | UNSAT _ -> status_tag s, []
+    | UNSAT _ -> (status_tag s, [])
     | SAT (errs, msg)
     | UNKNOWN (errs, msg)
     | TIMEOUT (errs, msg) -> BU.format2 "%s%s" (status_tag s) (match msg with None -> "" | Some msg -> " because " ^ msg), errs
 
-let tid () = BU.current_tid() |> BU.string_of_int
-let new_z3proc id =
-    BU.start_process id (Options.z3_exe ()) (ini_params ()) (fun s -> s = "Done!")
+let tid () : string = BU.current_tid() |> BU.string_of_int
+let new_z3proc (id : string) : BU.proc =
+    let filter : string -> bool = if Options.analyze_proof () then (fun s -> not (BU.starts_with s "[quantifier_instances]")) else (fun s -> true) in
+    BU.start_process id (Options.z3_exe ()) (ini_params ()) (fun s -> s = "Done!") filter
 
 type bgproc = {
-    ask: string -> string;
-    refresh:unit -> unit;
-    restart:unit -> unit
+    ask        : string -> string;
+    refresh    : unit -> string ;
+    restart    : unit -> unit;
+    kill       : unit -> string ;
+    store      : query_info -> list<decl> -> unit ;
+    extract    : unit -> list<(query_info * list<decl>)>;
 }
 
 type query_log = {
-    get_module_name: unit -> string;
-    set_module_name: string -> unit;
-    write_to_log:   string -> unit;
-    close_log:       unit -> unit;
-    log_file_name:   unit -> string
+    get_module_name : unit -> string;
+    set_module_name : string -> unit;
+    write_to_log    : string -> unit;
+    close_log       : unit -> unit;
+    log_file_name   : unit -> string
 }
 
-
-let query_logging = // : query_log
-    let query_number = BU.mk_ref 0 in
+let query_logging : query_log = // : query_log
+    let query_number : ref<int> = BU.mk_ref 0 in
     let log_file_opt : ref<option<file_handle>> = BU.mk_ref None in
     let used_file_names : ref<list<(string * int)>> = BU.mk_ref [] in
     let current_module_name : ref<option<string>> = BU.mk_ref None in
     let current_file_name : ref<option<string>> = BU.mk_ref None in
-    let set_module_name n = current_module_name := Some n in
-    let get_module_name () = match !current_module_name with
+    let set_module_name (n : string) : unit = current_module_name := Some n in
+    let get_module_name () : string =
+        match !current_module_name with
         | None -> failwith "Module name not set"
-        | Some n -> n in
-    let new_log_file () =
+        | Some n -> n
+    in
+    let new_log_file () : file_handle =
         match !current_module_name with
         | None -> failwith "current module not set"
         | Some n ->
-          let file_name =
+          let file_name : string =
               match List.tryFind (fun (m, _) -> n=m) !used_file_names with
               | None ->
                 used_file_names := (n, 0)::!used_file_names;
                 n
-              | Some (_, k) ->
+              | Some (_, k) ->      // How do we know k is maximal? Code seems to be assumming that.
                 used_file_names := (n, k+1)::!used_file_names;
                 BU.format2 "%s-%s" n (BU.string_of_int (k+1)) in
-          let file_name = BU.format1 "queries-%s.smt2" file_name in
+          let file_name : string = BU.format1 "queries-%s.smt2" file_name in
           current_file_name := Some file_name;
-          let fh = BU.open_file_for_writing file_name in
+          let fh : file_handle = BU.open_file_for_writing file_name in
           log_file_opt := Some fh;
-          fh in
-    let get_log_file () = match !log_file_opt with
+          fh
+    in
+    let get_log_file () : file_handle = match !log_file_opt with
         | None -> new_log_file()
-        | Some fh -> fh in
-    let append_to_log str = BU.append_to_file (get_log_file()) str in
-    let write_to_new_log str =
-      let dir_name = match !current_file_name with
+        | Some fh -> fh
+    in
+    let append_to_log (str : string) : unit =
+        BU.append_to_file (get_log_file()) str
+    in
+    let write_to_new_log (str : string) : unit =
+      let dir_name : string = match !current_file_name with
         | None ->
-          let dir_name = match !current_module_name with
+          let dir_name : string = match !current_module_name with
             | None -> failwith "current module not set"
-            | Some n -> BU.format1 "queries-%s" n in
+            | Some n -> BU.format1 "queries-%s" n
+          in
           BU.mkdir true dir_name;
           current_file_name := Some dir_name;
           dir_name
-        | Some n -> n in
-      let qnum = !query_number in
-      query_number := !query_number + 1;
-      let file_name = BU.format1 "query-%s.smt2" (BU.string_of_int qnum) in
-      let file_name = BU.concat_dir_filename dir_name file_name in
-      write_file file_name str in
-    let write_to_log str =
-      if (Options.n_cores() > 1) then write_to_new_log str
-      else append_to_log str
+        | Some n -> n
       in
-    let close_log () = match !log_file_opt with
+      let qnum : int = !query_number in
+      query_number := !query_number + 1;
+      let file_name : string = BU.format1 "query-%s.smt2" (BU.string_of_int qnum) in
+      let file_name : string = BU.concat_dir_filename dir_name file_name in
+      write_file file_name str
+    in
+    let write_to_log (str : string) : unit =
+      if (Options.n_cores() > 1) then write_to_new_log str else append_to_log str
+    in
+    let close_log () : unit = match !log_file_opt with
         | None -> ()
-        | Some fh -> BU.close_file fh; log_file_opt := None in
-    let log_file_name () = match !current_file_name with
+        | Some fh ->
+            BU.close_file fh;
+            log_file_opt := None
+    in
+    let log_file_name () : string = match !current_file_name with
         | None -> failwith "no log file"
-        | Some n -> n in
+        | Some n -> n
+    in
      {set_module_name=set_module_name;
       get_module_name=get_module_name;
       write_to_log=write_to_log;
       close_log=close_log;
       log_file_name=log_file_name}
 
-let bg_z3_proc = // : ref<bgproc>     (should this really be a ref?)
-    let the_z3proc = BU.mk_ref None in
-    let new_proc =
-        let ctr = BU.mk_ref (-1) in
-        fun () -> new_z3proc (BU.format1 "bg-%s" (incr ctr; !ctr |> string_of_int)) in
-    let z3proc () =
-      if !the_z3proc = None then
-        the_z3proc := Some (new_proc ());
-      must (!the_z3proc) in
+let bg_z3_proc : ref<bgproc> =
+    let the_z3proc : ref<option<BU.proc>> = BU.mk_ref None in
+    let the_queries : ref<(list<(query_info * list<decl>)>)> = BU.mk_ref [] in
+    let new_proc : unit -> BU.proc =
+        let ctr : ref<int> = BU.mk_ref (-1) in
+        fun () -> new_z3proc (BU.format1 "bg-%s" (incr ctr; !ctr |> string_of_int))
+    in
+    let z3proc () : BU.proc =
+      if !the_z3proc = None then begin
+        the_z3proc := Some (new_proc ()) ;
+        the_queries := []
+      end ;
+      must (!the_z3proc)
+    in
     let x : list<unit> = [] in
-    let ask input =
+    let ask (input : string) : string =
         let kill_handler () = "\nkilled\n" in
-        BU.ask_process (z3proc ()) input kill_handler in
-    let refresh () =
-        BU.kill_process (z3proc ());
+        BU.ask_process (z3proc ()) input kill_handler
+    in
+    let refresh () : string =
+        let extra : string = BU.kill_process (z3proc ()) in
         the_z3proc := Some (new_proc ());
-        query_logging.close_log() in
-    let restart () =
+        the_queries := [] ;
+        query_logging.close_log() ;
+        extra
+    in
+    let kill () : string =
+        if is_some (!the_z3proc) then
+            let extra : string = BU.kill_process (z3proc ()) in
+            the_z3proc := None ;
+            query_logging.close_log ();
+            the_queries := [] ;
+            extra
+        else ""
+    in
+    let restart () : unit =
         query_logging.close_log();
         the_z3proc := None;
-        the_z3proc := Some (new_proc ()) in
+        the_z3proc := Some (new_proc ())
+    in
+    let store (info : query_info) (decls : list<decl>) : unit =
+        the_queries := (!the_queries)@[(info , decls)]
+    in
+    let extract () : list<(query_info * list<decl>)> =
+        !(the_queries)
+    in
     BU.mk_ref ({ask = BU.with_monitor x ask;
                 refresh = BU.with_monitor x refresh;
-                restart = BU.with_monitor x restart})
+                restart = BU.with_monitor x restart;
+                kill = BU.with_monitor x kill;
+                store = store;
+                extract = extract})
 
-let set_bg_z3_proc bgp =
+let set_bg_z3_proc (bgp : bgproc) : unit =
     bg_z3_proc := bgp
 
-let at_log_file () =
+let at_log_file () : string =
   if Options.log_queries()
   then "@" ^ (query_logging.log_file_name())
   else ""
@@ -266,9 +317,7 @@ type smt_output = {
 }
 
 let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
-    // until tag lines returns None if tag is not one of the lines,
-    // or Some(prefix ,suffix) where prefix are the lines before the tag, and suffix the lines after the tag
-    let rec until (tag : string) (lines : list<string>) : option<list<string> * list<string>> =
+    let rec until (tag : string) (lines : list<string>) : option<(list<string> * list<string>)> =
         match lines with
         | [] -> None
         | l::lines ->
@@ -278,12 +327,7 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
     in
     let start_tag tag = "<" ^ tag ^ ">" in
     let end_tag tag = "</" ^ tag ^ ">" in
-    // find_section tag lines extracts from lines the section contained between
-    // the first <tag> line and the first subsequent </tag> line, as well as the rest of lines.
-    // the output is (Some(section) , rest) if such a section is found
-    // (None, rest) if <tag> is not found
-    // and a failure if <tag> is found but no subsequent </tag> is found
-    let find_section tag lines : option<(list<string>)> * list<string> =
+    let find_section (tag : string) (lines : list<string>) : option<(list<string>)> * list<string> =
        match until (start_tag tag) lines with
        | None -> None, lines
        | Some (prefix, suffix) ->
@@ -291,19 +335,19 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
          | None -> failwith ("Parse error: " ^ end_tag tag ^ " not found")
          | Some (section, suffix) -> Some section, prefix @ suffix
     in
-    let result_opt, lines = find_section "result" lines in
-    let result = BU.must result_opt in
-    let reason_unknown, lines = find_section "reason-unknown" lines in
-    let unsat_core, lines = find_section "unsat-core" lines in
-    let refutation, lines = 
+    let result_opt, lines : option<smt_output_section> * list<string> = find_section "result" lines in
+    let result : smt_output_section = BU.must result_opt in
+    let reason_unknown, lines : option<smt_output_section> * list<string> = find_section "reason-unknown" lines in
+    let unsat_core, lines : option<smt_output_section> * list<string> = find_section "unsat-core" lines in
+    let refutation, lines : option<smt_output_section> * list<string> = 
         if Options.analyze_proof () then
             find_section "proof" lines
         else
             None , lines
     in
-    let statistics, lines = find_section "statistics" lines in
-    let labels, lines = find_section "labels" lines in
-    let remaining =
+    let statistics, lines : option<smt_output_section> * list<string> = find_section "statistics" lines in
+    let labels, lines : option<smt_output_section> * list<string> = find_section "labels" lines in
+    let remaining : list<string> =
       match until "Done!" lines with
       | None -> lines
       | Some (prefix, suffix) -> prefix@suffix in
@@ -313,7 +357,7 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
         | _ ->
             FStar.Errors.log_issue
                      r
-                     (Errors.Warning_UnexpectedZ3Output, (BU.format1 "Unexpected output from Z3: %s\n"
+                     (Errors.Warning_UnexpectedZ3Output, (BU.format1 "Unexpected additional output from Z3: %s\n"
                                     (String.concat "\n" remaining))) in
     {smt_result = BU.must result_opt;
      smt_reason_unknown = reason_unknown;
@@ -322,8 +366,9 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
      smt_labels = labels;
      smt_refutation = refutation}
 
-let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_labels) : z3status * z3statistics =
-  let parse (z3out:string) =
+let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (label_messages:error_labels) : z3status * z3statistics =
+  let r : Range.range = info.query_info_range in
+  let parse (z3out:string) : z3status * z3statistics =
     let lines = String.split ['\n'] z3out |> List.map BU.trim_string in
     let smt_output : smt_output = smt_output_sections r lines in
     let unsat_core : unsat_core =
@@ -352,25 +397,25 @@ let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_la
                    | None -> []
                    | Some (lbl, msg, r) -> [(lbl, msg, r)])
     in
-    let statistics =
-        let statistics : z3statistics = BU.smap_create 0 in
+    let statistics : BU.smap<string> =
+        let statistics : BU.smap<string> = BU.smap_create 0 in
         match smt_output.smt_statistics with
-        | None -> statistics
-        | Some lines ->
-          let parse_line line =
-            let pline = BU.split (BU.trim_string line) ":" in
-            match pline with
-            | "(" :: entry :: []
-            |  "" :: entry :: [] ->
-               let tokens = BU.split entry " " in
-               let key = List.hd tokens in
-               let ltok = List.nth tokens ((List.length tokens) - 1) in
-               let value = if BU.ends_with ltok ")" then (BU.substring ltok 0 ((String.length ltok) - 1)) else ltok in
-               BU.smap_add statistics key value
-            | _ -> ()
-          in
-          List.iter parse_line lines;
-          statistics
+            | None -> statistics
+            | Some lines ->
+            let parse_line line =
+                let pline = BU.split (BU.trim_string line) ":" in
+                match pline with
+                | "(" :: entry :: []
+                |  "" :: entry :: [] ->
+                let tokens = BU.split entry " " in
+                let key = List.hd tokens in
+                let ltok = List.nth tokens ((List.length tokens) - 1) in
+                let value = if BU.ends_with ltok ")" then (BU.substring ltok 0 ((String.length ltok) - 1)) else ltok in
+                BU.smap_add statistics key value
+                | _ -> ()
+            in
+            List.iter parse_line lines;
+            statistics
     in
     let reason_unknown = BU.map_opt smt_output.smt_reason_unknown (fun x ->
         let ru = String.concat " " x in
@@ -393,13 +438,19 @@ let doZ3Exe (r:Range.range) (fresh:bool) (input:string) (label_messages:error_la
     in
     status, statistics
   in
-  let stdout =
+  let stdout : string =
     if fresh then
       BU.run_process (tid ()) (Options.z3_exe ()) (ini_params ()) (Some input)
     else
       (!bg_z3_proc).ask input
   in
-  parse (BU.trim_string stdout)
+  let (status , statistics) : z3status * z3statistics = parse (BU.trim_string stdout) in
+  if Options.analyze_proof () then begin
+    match status with
+      | UNSAT (_ , _) -> if fresh then failwith "Option --analyze_proof is incompatible with multi-core solving" else (!bg_z3_proc).store info decls
+      | _ -> ()
+  end ;
+  (status , statistics)
 
 let z3_options = BU.mk_ref
     "(set-option :global-decls false)\n\
@@ -424,33 +475,32 @@ type z3result = {
       z3result_time        : int;
       z3result_statistics  : z3statistics;
       z3result_query_hash  : option<string> ;
-      z3result_query_decls : list<decl> ;
 }
 
 type z3job = job_t<z3result>
 
 let job_queue : ref<list<z3job>> = BU.mk_ref []
 
-let pending_jobs = BU.mk_ref 0
+let pending_jobs : ref<int> = BU.mk_ref 0
 
-let z3_job (r:Range.range) fresh (label_messages:error_labels) input (decls : list<decl>) qhash () : z3result =
-  let start = BU.now() in
-  let status, statistics =
-    try doZ3Exe r fresh input label_messages
+let z3_job (r : query_info) (fresh : bool) (label_messages:error_labels) (input : string) (decls : list<decl>) (qhash : option<string>) () : z3result =
+  let start : BU.time = BU.now() in
+  let status, statistics : z3status * z3statistics =
+    try doZ3Exe r decls fresh input label_messages
     with e when not (Options.trace_error()) ->
-         (!bg_z3_proc).refresh();
-         raise e
+      ignore <| (!bg_z3_proc).extract () ;
+      ignore <| (!bg_z3_proc).refresh() ;
+      raise e
   in
-  let _, elapsed_time = BU.time_diff start (BU.now()) in
+  let _, elapsed_time : float * int = BU.time_diff start (BU.now()) in
   { z3result_status     = status;
     z3result_time       = elapsed_time;
     z3result_statistics = statistics;
-    z3result_query_hash = qhash ;
-    z3result_query_decls = decls }
+    z3result_query_hash = qhash ; }
 
-let running = BU.mk_ref false
+let running : ref<bool> = BU.mk_ref false
 
-let rec dequeue' () =
+let rec dequeue' () : unit =
     (*print_string (BU.string_of_int (List.length !job_queue));*)
     let j = match !job_queue with
         | [] -> failwith "Impossible"
@@ -460,9 +510,11 @@ let rec dequeue' () =
     incr pending_jobs;
     BU.monitor_exit job_queue;
     run_job j;
-    BU.with_monitor job_queue (fun () -> decr pending_jobs) (); dequeue (); ()
+    BU.with_monitor job_queue (fun () -> decr pending_jobs) ();
+    dequeue ();
+    ()
 
-and dequeue () = match !running with
+and dequeue () : unit = match !running with
   | true ->
     let rec aux () =
       BU.monitor_enter (job_queue);
@@ -475,26 +527,32 @@ and dequeue () = match !running with
     aux()
   | false -> ()
 
-and run_job j = j.callback <| j.job ()
+and run_job (j : z3job) : unit =
+    j.callback <| j.job ()
+
+let kill () =
+    BU.print "[FINISH]\n" [] ;
+    if (Options.n_cores () < 2) then
+        ignore <| (!bg_z3_proc).kill ()
 
 (* threads are spawned only if fresh, I.e. we check here and in ask the mode of execution,
    should be improved by using another option, see ask *)
-let init () =
+let init () : unit =
     running := true;
-    let n_cores = (Options.n_cores()) in
+    let n_cores : int = (Options.n_cores()) in
     if (n_cores > 1) then
-      let rec aux n =
+      let rec aux (n : int) : unit =
           if n = 0 then ()
           else (spawn dequeue; aux (n - 1)) in
       aux n_cores
     else ()
 
-let enqueue j =
+let enqueue (j : z3job) : unit =
     BU.with_monitor job_queue (fun () ->
         job_queue := !job_queue@[j];
         BU.monitor_pulse job_queue) ()
 
-let finish () =
+let finish () : unit =
     let rec aux () =
         let n, m = BU.with_monitor job_queue (fun () -> !pending_jobs,  List.length !job_queue) () in
         //Printf.printf "In finish: pending jobs = %d, job queue len = %d\n" n m;
@@ -502,12 +560,7 @@ let finish () =
         then running := false
         else let _ = BU.sleep(500) in
              aux() in
-    aux()
-
-type scope_t = list<list<decl>>
-
-let collect (scope : scope_t) =
-  List.fold_right (fun x y -> (List.rev x) @ y) scope []
+    if (Options.n_cores () > 1) then aux() else kill ()
 
 // bg_scope is a global, mutable variable that keeps a list of the declarations
 // that we have given to z3 so far. In order to allow rollback of history,
@@ -515,50 +568,73 @@ let collect (scope : scope_t) =
 // on fresh_scope (a stack) -- one can then, for instance, verify these
 // declarations immediately, then call pop so that subsequent queries will not
 // reverify or use these declarations
-let fresh_scope : ref<scope_t> = BU.mk_ref [[]]
-let mk_fresh_scope () = !fresh_scope
-
+// 
 // bg_scope: Is the flat sequence of declarations already given to Z3
 //           When refreshing the solver, the bg_scope is set to
 //           a flattened version of fresh_scope
-let bg_scope : ref<list<decl>> = BU.mk_ref []
-
+// 
 // fresh_scope is a mutable reference; this pushes a new list at the front;
 // then, givez3 modifies the reference so that within the new list at the front,
 // new queries are pushed
-let push msg    = BU.atomically (fun () ->
-    fresh_scope := [Caption msg; Push]::!fresh_scope;   // prepends the list [Caption msg , Push] in fresh_scope. This becomes the new "active" list in the stack
-    bg_scope := !bg_scope @ [Push; Caption msg])        // appends the elements Push and Caption msg into bg_scope
 
-let pop msg      = BU.atomically (fun () ->
-    fresh_scope := List.tl !fresh_scope;                // drop the last stage in the stack.
-    bg_scope := !bg_scope @ [Caption msg; Pop])         // append the elements Caption msg and Pop
+type scope_t = list<list<decl>>
 
-let snapshot msg = Common.snapshot push fresh_scope msg
-let rollback msg depth = Common.rollback (fun () -> pop msg) fresh_scope depth
+let stack_scope : ref<scope_t> = BU.mk_ref [[]]
+let stack_delta : ref<decls_t> = BU.mk_ref []
 
-//giveZ3 decls: adds decls to the stack of declarations
-//              to be actually given to Z3 only when the next
-//              query comes up
-let giveZ3 decls =
-   decls |> List.iter (function Push | Pop -> failwith "Unexpected push/pop" | _ -> ());
-   // This is where we prepend new queries to the head of the list at the head
-   // of fresh_scope
-   begin match !fresh_scope with
-    | hd::tl -> fresh_scope := (hd@decls)::tl
-    | _ -> failwith "Impossible"
-   end;
-   bg_scope := !bg_scope @ decls
+// Gets the incremental delta since the last clearing
+let incremental_scope () : decls_t = !stack_delta
+
+// Gets the flat stack state
+let cummulative_scope () : decls_t = List.flatten (List.rev !stack_scope)
+
+// Clears the current delta
+let clear_scope () : unit = stack_delta := []
+
+// Gets the current stack
+let get_scope () : scope_t = !stack_scope
+
+// Sets the current incremental delta to the flat stack state.
+let reset_scope () : unit = stack_delta := cummulative_scope ()
+
+// Adds a list of declarations to the stack and the incremental delta
+let add_to_scopes (decls : decls_t) : unit = begin match !stack_scope with
+        | hd::tl -> stack_scope := (hd @ decls)::tl
+        | _ -> failwith "Impossible"
+    end;
+    stack_delta := !stack_delta @ decls
+
+// Pushes a new level in the stack
+let push (msg : string) : unit =
+    BU.atomically (fun () ->
+        stack_scope := [Push ; Caption msg] :: !stack_scope;
+        stack_delta := !stack_delta @ [Push; Caption msg]
+    )
+
+// Pops a level from the stack
+let pop (msg : string) : unit =
+    BU.atomically (fun () ->
+        stack_scope := List.tl !stack_scope;
+        stack_delta := !stack_delta @ [Pop ; Caption msg]
+    )
+let snapshot (msg : string) = Common.snapshot push stack_scope msg
+let rollback (msg : string) (depth : option<int>) = Common.rollback (fun () -> pop msg) stack_scope depth
+
+let giveZ3 (decls : decls_t) : unit =
+    decls |> List.iter (function Push | Pop -> failwith "Unexpected push/pop" | _ -> ());
+    add_to_scopes decls
 
 //refresh: create a new z3 process, and reset the bg_scope
 let refresh () =
     if (Options.n_cores() < 2) then
-        (!bg_z3_proc).refresh();
-        bg_scope := List.flatten (List.rev !fresh_scope)
+        let query_data : list<(query_info * list<decl>)> = (!bg_z3_proc).extract () in
+        let qip_output : string = (!bg_z3_proc).refresh () in
+        reset_scope () ;
+        if Options.analyze_proof () then qiprofile_analysis query_data qip_output else ()
 
-let mk_input theory : string * option<string> =
-    let options = !z3_options in
-    let r, hash =
+let mk_input (theory : list<decl>) : string * option<string> =
+    let options : string = !z3_options in
+    let r, hash : string * option<string> =
         if Options.record_hints()
         || (Options.use_hints() && Options.use_hint_hashes()) then
             //the suffix of a "theory" that follows the "CheckSat" call
@@ -567,20 +643,19 @@ let mk_input theory : string * option<string> =
             //that vary depending on some user options (e.g., record_hints etc.)
             //They should not be included in the query hash,
             //so split the prefix out and use only it for the hash
-            let prefix, check_sat, suffix =
+            let prefix, check_sat, suffix : list<decl> * decl * list<decl> =
                 theory |>
                 BU.prefix_until (function CheckSat -> true | _ -> false) |>
                 Option.get
             in
-            let pp = List.map (declToSmt options) in
-            let suffix = check_sat::suffix in
-            let ps_lines = pp prefix in
-            let ss_lines = pp suffix in
-            let ps = String.concat "\n" ps_lines in
-            let ss = String.concat "\n" ss_lines in
-
-            (* Ignore captions AND ranges when hashing, otherwise we depend on file names *)
-            let hs =
+            let pp : list<decl> -> list<string> = List.map (declToSmt options) in
+            let suffix : list<decl> = check_sat::suffix in
+            let ps_lines : list<string> = pp prefix in
+            let ss_lines : list<string> = pp suffix in
+            let ps : string = String.concat "\n" ps_lines in
+            let ss : string = String.concat "\n" ss_lines in
+            //Ignore captions AND ranges when hashing, otherwise we depend on file names
+            let hs : string =
               if Options.keep_query_captions ()
               then prefix
                    |> List.map (declToSmt_no_caps options)
@@ -592,26 +667,21 @@ let mk_input theory : string * option<string> =
             List.map (declToSmt options) theory |> String.concat "\n", None
     in
     if Options.log_queries() then query_logging.write_to_log r ;
-    r, hash
+    r , hash
 
 type cb = z3result -> unit
 
-let cache_hit
-    (cache:option<string>)
-    (qhash:option<string>)
-    (cb:cb) 
-    (decls : list<decl>) =
+let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb:cb) (decls : decls_t) : bool =
     if Options.use_hints() && Options.use_hint_hashes() then
         match qhash with
         | Some (x) when qhash = cache ->
-            let stats : z3statistics = BU.smap_create 0 in
+            let stats : BU.smap<string> = BU.smap_create 0 in
             smap_add stats "fstar_cache_hit" "1";
             let result = {
               z3result_status = UNSAT (None , None);
               z3result_time = 0;
-              z3result_statistics = stats;
-              z3result_query_hash = qhash;
-              z3result_query_decls = decls;
+              z3result_statistics = stats ;
+              z3result_query_hash = qhash ;
             } in
             cb result;
             true
@@ -620,52 +690,30 @@ let cache_hit
     else
         false
 
-let ask_1_core
-    (r:Range.range)
-    (filter_theory:decls_t -> decls_t * bool)
-    (cache:option<string>)
-    (label_messages:error_labels)
-    (qry:decls_t)
-    (cb:cb)
-  = let theory = !bg_scope@[Push]@qry@[Pop] in
-    let theory, used_unsat_core = filter_theory theory in
+let ask_1_core (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache:option<string>)
+            (label_messages:error_labels) (qry:decls_t) (cb:cb) : unit =
+    let cumm_theory : decls_t = (cummulative_scope ())@[Push]@qry@[Pop] in
+    let incr_theory : decls_t = (incremental_scope ())@[Push]@qry@[Pop] in
+    clear_scope () ;
+    let incr_theory, used_unsat_core : decls_t * bool = filter_theory incr_theory in
+    let input, qhash : string * option<string> = mk_input incr_theory in
+    if not (cache_hit r cache qhash cb cumm_theory) then
+        run_job ({job=z3_job r false label_messages input cumm_theory qhash; callback=cb})
+
+let ask_n_cores (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache:option<string>)
+            (label_messages:error_labels) (qry:decls_t) (scope:option<scope_t>) (cb:cb) : unit =
+    let theory : decls_t = match scope with
+        | Some s -> List.flatten (List.rev s)
+        | None -> ( clear_scope () ; cummulative_scope () )
+    in
+    let theory , used_unsat_core : decls_t * bool = filter_theory theory in
     let input, qhash = mk_input theory in
-    // let qdecls = (collect (!fresh_scope))@qry in
-    bg_scope := [] ; // Now consumed.
-    // if not (cache_hit cache qhash cb qdecls) then
-        // run_job ({job=z3_job r false label_messages input qdecls qhash; callback=cb})
-    if not (cache_hit cache qhash cb []) then
-        run_job ({job=z3_job r false label_messages input [] qhash; callback=cb})
+    if not (cache_hit r cache qhash cb theory) then
+        enqueue ({job=z3_job r true label_messages input theory qhash; callback=cb})
 
-// for now proof analysis only works for single-core
-
-let ask_n_cores
-    (r:Range.range)
-    (filter_theory:decls_t -> decls_t * bool)
-    (cache:option<string>)
-    (label_messages:error_labels)
-    (qry:decls_t)
-    (scope:option<scope_t>)
-    (cb:cb)
-  = let theory = List.flatten (match scope with
-        | Some s -> (List.rev s)
-        | None   -> bg_scope := [] ; // Not needed; discard.
-                    (List.rev !fresh_scope)) in
-    let theory = theory@[Push]@qry@[Pop] in
-    let theory, used_unsat_core = filter_theory theory in
-    let input, qhash = mk_input theory in
-    if not (cache_hit cache qhash cb []) then
-        enqueue ({job=z3_job r true label_messages input [] qhash; callback=cb})
-
-let ask
-    (r:Range.range)
-    (filter:decls_t -> decls_t * bool)
-    (cache:option<string>)
-    (label_messages:error_labels)
-    (qry:decls_t)
-    (scope:option<scope_t>)
-    (cb:cb)
-  = if Options.n_cores() = 1 then
+let ask (r: query_info) (filter:decls_t -> decls_t * bool) (cache:option<string>)
+            (label_messages:error_labels) (qry:decls_t) (scope:option<scope_t>) (cb:cb) : unit =
+    if Options.n_cores() = 1 then
         ask_1_core r filter cache label_messages qry cb
     else
         ask_n_cores r filter cache label_messages qry scope cb

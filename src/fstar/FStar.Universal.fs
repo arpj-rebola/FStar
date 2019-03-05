@@ -120,7 +120,7 @@ let parse (env:uenv) (pre_fn: option<string>) (fn:string)
 (***********************************************************************)
 (* Initialize a clean environment                                      *)
 (***********************************************************************)
-let init_env deps : TcEnv.env =
+let init_env (deps : FStar.Parser.Dep.deps) : TcEnv.env =
   let solver =
     if Options.lax()
     then SMT.dummy
@@ -329,7 +329,7 @@ let apply_delta_env env (f:delta_env) =
     match f with
     | None -> env
     | Some f -> f env
-let extend_delta_env (f:delta_env) (g:uenv->uenv) =
+let extend_delta_env (f:delta_env) (g:uenv->uenv) : delta_env =
     match f with
     | None -> Some g
     | Some f -> Some (fun e -> g (f e))
@@ -540,7 +540,8 @@ let rec tc_fold_interleave (acc:list<tc_result> * list<FStar.Extraction.ML.Synta
 (***********************************************************************)
 (* Batch mode: checking many files                                     *)
 (***********************************************************************)
-let batch_mode_tc filenames dep_graph =
+let batch_mode_tc (filenames : list<string>) (dep_graph : FStar.Parser.Dep.deps) :
+      list<tc_result> * uenv * delta_env  =
   if Options.debug_any () then begin
     FStar.Util.print_endline "Auto-deps kicked in; here's some info.";
     FStar.Util.print1 "Here's the list of filenames we will process: %s\n"
@@ -548,10 +549,12 @@ let batch_mode_tc filenames dep_graph =
     FStar.Util.print1 "Here's the list of modules we will verify: %s\n"
       (String.concat " " (filenames |> List.filter Options.should_verify_file))
   end;
-  let env = FStar.Extraction.ML.UEnv.mkContext (init_env dep_graph) in
-  let all_mods, mllibs, env, delta = tc_fold_interleave ([], [], env, None) filenames in
+  let env : uenv = FStar.Extraction.ML.UEnv.mkContext (init_env dep_graph) in
+  let (all_mods, mllibs, env, delta) : list<tc_result> * list<FStar.Extraction.ML.Syntax.mllib> * uenv * delta_env =
+      tc_fold_interleave ([], [], env, None) filenames
+  in
   emit mllibs;
-  let solver_refresh env =
+  let solver_refresh (env : uenv) : uenv =
       snd <|
       with_tcenv_of_env env (fun tcenv ->
           if Options.interactive()

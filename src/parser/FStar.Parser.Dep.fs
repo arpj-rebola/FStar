@@ -59,16 +59,17 @@ type color = | White | Gray | Black
 (* In public interface *)
 type open_kind = | Open_module | Open_namespace
 
-let check_and_strip_suffix (f: string): option<string> =
-  let suffixes = [ ".fsti"; ".fst"; ".fsi"; ".fs" ] in
-  let matches = List.map (fun ext ->
-    let lext = String.length ext in
-    let l = String.length f in
+let check_and_strip_suffix (f : string) : option<string> =
+  let suffixes : list<string> = [ ".fsti"; ".fst"; ".fsi"; ".fs" ] in
+  let try_strip (ext : string) : option<string> =
+    let lext : int = String.length ext in
+    let l : int = String.length f in
     if l > lext && String.substring f (l - lext) lext = ext then
-      Some (String.substring f 0 (l - lext))
+        Some (String.substring f 0 (l - lext))
     else
-      None
-  ) suffixes in
+        None
+  in
+  let matches : list<(option<string>)> = List.map try_strip suffixes in
   match List.filter is_some matches with
   | Some m :: _ ->
       Some m
@@ -90,7 +91,7 @@ let list_of_pair (intf, impl) =
   list_of_option intf @ list_of_option impl
 
 (* In public interface *)
-let module_name_of_file f =
+let module_name_of_file (f : string) : string =
     match check_and_strip_suffix (basename f) with
     | Some longname ->
       longname
