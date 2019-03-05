@@ -4566,14 +4566,5 @@ in ((t), ((((ctx_uvar), (r)))::[]), (g)))));
 end)))
 
 
-let dummy_solver : solver_t = {init = (fun uu____24960 -> ()); push = (fun uu____24962 -> ()); pop = (fun uu____24965 -> ()); snapshot = (fun uu____24968 -> (((((Prims.parse_int "0")), ((Prims.parse_int "0")), ((Prims.parse_int "0")))), (()))); rollback = (fun uu____24987 uu____24988 -> ()); encode_modul = (fun uu____25003 uu____25004 -> ()); encode_sig = (fun uu____25007 uu____25008 -> ()); preprocess = (fun e g -> (
-
-let uu____25014 = (
-
-let uu____25021 = (FStar_Options.peek ())
-in ((e), (g), (uu____25021)))
-in (uu____25014)::[])); solve = (fun uu____25037 uu____25038 uu____25039 -> ()); finish = (fun uu____25046 -> ()); refresh = (fun uu____25048 -> ())}
-
-
 
 

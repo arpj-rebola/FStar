@@ -2,6 +2,7 @@
 
 module FStar.SMTEncoding.Analysis
 open FStar
+open FStar.All
 open FStar.Common
 open FStar.List
 open FStar.Range
