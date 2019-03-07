@@ -64,17 +64,6 @@
     <Compile Include="FStar.SMTEncoding.Term.fsi" />
     <Compile Include="FStar.SMTEncoding.Term.fs" />
     <Compile Include="FStar.SMTEncoding.Util.fs" />
-    <FsYacc Include="FStar.SMTEncoding.SMTParser.fsp">
-      <OtherFlags>--module FStar.SMTEncoding.SMTParser --open FStar.SMTEncoding.SMTSexpr</OtherFlags>
-    </FsYacc>
-    <Compile Include="FStar.SMTEncoding.SMTSexpr.fs" />
-    <Compile Include="FStar.SMTEncoding.SMTParser.fsi" />
-    <Compile Include="FStar.SMTEncoding.SMTParser.fs" />
-    <FsLex Include="FStar.SMTEncoding.SMTLexer.fss">
-      <OtherFlags>--unicode</OtherFlags>
-    </FsLex>
-    <Compile Include="FStar.SMTEncoding.SMTLexer.fs" />
-    <Compile Include="FStar.SMTEncoding.SMTRead.fs" />
     <Compile Include="FStar.SMTEncoding.Analysis.fsi" />
     <Compile Include="FStar.SMTEncoding.Analysis.fs" />
     <Compile Include="FStar.SMTEncoding.Z3.fsi" />
@@ -88,6 +77,9 @@
     <Compile Include="FStar.SMTEncoding.Encode.fs" />
     <Compile Include="FStar.SMTEncoding.Solver.fsi" />
     <Compile Include="FStar.SMTEncoding.Solver.fs" />
+    <FsYacc Include="FStar.SMTEncoding.ProofParser.fsp" />
+    <FsLex Include="FStar.SMTEncoding.ProofLexer.fss" />
+    <Compile Include="FStar.SMTEncoding.SMTProof.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

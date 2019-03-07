@@ -16,7 +16,7 @@ open FStar.SMTEncoding.SMTProof
 %token LET
 %token TERM BOOLEAN STRING INTEGER FUEL
 %token ARBITRARY CONGRUENCE REFLEXIVITY SYMMETRY TRANSITIVITY REACHABILITY GENERALIZATION POSITIVE_NNF NEGATIVE_NNF REWRITING MODUS_PONENS MODUS_PONENS_EQUIV UNIT_RESOLUTION AXIOM THEORY_LEMMA INSTANTIATION SKOLEMIZATION
-%token ARITHMETICS TRIANGLE_INEQUALITY FARKAS_LEMMA
+%token ASSERTED ARITHMETICS TRIANGLE_INEQUALITY FARKAS_LEMMA
 %token EOF
 
 %start start
@@ -98,6 +98,12 @@ annotations:
   | QID ID annotations
       { }
 
+definitions:
+  |
+      { }
+  | LPAREN ID proof RPAREN definitions
+      { ($2 , $3) }
+
 proofs:
   |
       { [] }
@@ -137,7 +143,7 @@ proof:
       { Generalization ($3) }
   | LPAREN LPAREN PARAMETRIC INSTANTIATION proof RPAREN proof RPAREN
       { Instantiation ($5 , $7) }
-  | LPAREN REWRITE proof RPAREN
+  | LPAREN REWRITING proof RPAREN
       { Rewrite ($3) }
   | LPAREN MODUS_PONENS proof proof proof RPAREN
       { ModusPonens ($3 , $4 , $5) }
@@ -146,9 +152,9 @@ proof:
   | LPAREN SKOLEMIZATION proof RPAREN
       { Skolemization ($3) }
   | LPAREN POSITIVE_NNF proofs RPAREN
-      { PositiveNnf }
+      { PosNnf }
   | LPAREN NEGATIVE_NNF proofs RPAREN
-      { NegativeNnf }
+      { NegNnf }
   | LPAREN UNIT_RESOLUTION proofs RPAREN
       { UnitResolution }
   | LPAREN ASSERTED proof RPAREN
@@ -156,4 +162,4 @@ proof:
   | LPAREN LPAREN PARAMETRIC THEORY_LEMMA theory RPAREN proofs RPAREN
       { TheoryLemma ($5 , $7) }
   | LPAREN ANNOTATION proof annotations RPAREN
-
+      { $3 }
