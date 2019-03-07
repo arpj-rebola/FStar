@@ -13,6 +13,8 @@ open FStar.SMTEncoding.Term
 open FStar.BaseTypes
 module DEP = FStar.Parser.Dep
 
+let max (i : int) (j : int) : int = if i < j then j else i
+
 type pretty_alignment =
     | PrettyLeft
     | PrettyRight
@@ -141,7 +143,7 @@ let rec extract_quantifiers_from_decls (query : query_info) (decl : decl) : list
                         quantifier_info_query = query ;
                         quantifier_info_quantifier = tm ;
                         quantifier_info_context = context }) :: (aux t)
-                | None -> failwith "No QID found" []
+                | None -> failwith "No QID found"
             end
             | Let (tms , t) -> (aux t) @ (List.collect aux tms)
             | Labeled (t , _ , _)
@@ -176,9 +178,9 @@ let profile_quantifiers (queries : list<(query_info * list<decl>)>) (qiprofile_o
             | [] -> []
             | (s , q) :: tl -> List.rev (aux tl s [q] [])
     in
-    let qiprofile : qiprofile_map = parse_qiprofile qiprofile_output in
+    let qip : qiprofile_map = parse_qiprofile qiprofile_output in
     let insert (o : psmap<qiprofile>) ((id , info) : string * list<quantifier_info>) : psmap<qiprofile> =
-        let (inst , gen , cost) : (int * int * int) = match psmap_try_find qiprofile id with
+        let (inst , gen , cost) : (int * int * int) = match psmap_try_find qip id with
             | None -> (0 , 0 , 0)
             | Some x -> x
         in
@@ -205,7 +207,7 @@ let tabular_profile (q : psmap<qiprofile>) : list<(list<string>)> =
         let prof : qiprofile = must (psmap_try_find q k) in
         if prof.qiprofile_instances > 0 then
             match prof.qiprofile_quantifiers with
-                | [] -> failwith "QID not found" []
+                | [] -> failwith "QID not found"
                 | hd :: tl ->
                     o @ ([ prof.qiprofile_id ;
                             string_of_int (prof.qiprofile_instances) ;
@@ -229,7 +231,7 @@ let qiprofile_analysis (queries : list<(query_info * list<decl>)>) (qiprofile_ou
             let (content_string , content_length) : string * int = prettyprint_table fmt tab in
             let (header_string , header_length) : string * int =
                 let headers : list<string> = queries |> List.map (fun ((q , ds) : query_info * list<decl>) -> query_name q) in
-                String.concat "\n" headers , List.fold (fun (x : int) (s : string) -> max x (String.length s)) 0 headers
+                String.concat "\n" headers , List.fold_left (fun (x : int) (s : string) -> max x (String.length s)) 0 headers
             in
             let line : string = repeat (max content_length header_length) "-" in
             print (line ^ "\n" ^ header_string ^ "\n" ^ line ^ "\n" ^ content_string ^ "\n" ^ line ^ "\n\n" ) []

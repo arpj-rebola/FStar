@@ -429,8 +429,6 @@ let float_of_int64 (n:int64) = (float)n
 
 let int_of_int32 (i:int32) = i
 let int32_of_int (i:int) = int32 i
-let max (i : int) (j : int) : int = if i < j then j else i
-let min (i : int) (j : int) : int = if i < j then i else j
 
 let string_of_int   i = string_of_int i
 let string_of_bool b = if b then "true" else "false"

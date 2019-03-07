@@ -352,7 +352,7 @@ in ((report_errors module_names_and_times);
 end))
 end))
 end
-| uu____679 -> begin
+| uu____664 -> begin
 (FStar_Errors.raise_error ((FStar_Errors.Error_MissingFileName), ("No file provided")) FStar_Range.dummyRange)
 end)
 end))
@@ -396,12 +396,12 @@ end
 | FStar_Syntax_Syntax.Lazy_uvar -> begin
 (FStar_Syntax_Util.exp_string "((uvar))")
 end
-| FStar_Syntax_Syntax.Lazy_embedding (uu____702, t) -> begin
+| FStar_Syntax_Syntax.Lazy_embedding (uu____687, t) -> begin
 (FStar_Common.force_thunk t)
 end))
 
 
-let setup_hooks : unit  ->  unit = (fun uu____759 -> ((FStar_ST.op_Colon_Equals FStar_Syntax_Syntax.lazy_chooser (FStar_Pervasives_Native.Some (lazy_chooser)));
+let setup_hooks : unit  ->  unit = (fun uu____744 -> ((FStar_ST.op_Colon_Equals FStar_Syntax_Syntax.lazy_chooser (FStar_Pervasives_Native.Some (lazy_chooser)));
 (FStar_ST.op_Colon_Equals FStar_Syntax_Util.tts_f (FStar_Pervasives_Native.Some (FStar_Syntax_Print.term_to_string)));
 (FStar_ST.op_Colon_Equals FStar_TypeChecker_Normalize.unembed_binder_knot (FStar_Pervasives_Native.Some (FStar_Reflection_Embeddings.e_binder)));
 ))
@@ -411,31 +411,31 @@ let handle_error : Prims.exn  ->  unit = (fun e -> ((match ((FStar_Errors.handle
 | true -> begin
 (FStar_Errors.err_exn e)
 end
-| uu____875 -> begin
+| uu____860 -> begin
 ()
 end);
 (
 
-let uu____878 = (FStar_Options.trace_error ())
-in (match (uu____878) with
+let uu____863 = (FStar_Options.trace_error ())
+in (match (uu____863) with
 | true -> begin
 (
 
-let uu____881 = (FStar_Util.message_of_exn e)
+let uu____866 = (FStar_Util.message_of_exn e)
 in (
 
-let uu____883 = (FStar_Util.trace_of_exn e)
-in (FStar_Util.print2_error "Unexpected error\n%s\n%s\n" uu____881 uu____883)))
+let uu____868 = (FStar_Util.trace_of_exn e)
+in (FStar_Util.print2_error "Unexpected error\n%s\n%s\n" uu____866 uu____868)))
 end
-| uu____886 -> begin
+| uu____871 -> begin
 (match ((not ((FStar_Errors.handleable e)))) with
 | true -> begin
 (
 
-let uu____889 = (FStar_Util.message_of_exn e)
-in (FStar_Util.print1_error "Unexpected error; please file a bug report, ideally with a minimized version of the source program that triggered the error.\n%s\n" uu____889))
+let uu____874 = (FStar_Util.message_of_exn e)
+in (FStar_Util.print1_error "Unexpected error; please file a bug report, ideally with a minimized version of the source program that triggered the error.\n%s\n" uu____874))
 end
-| uu____892 -> begin
+| uu____877 -> begin
 ()
 end)
 end));
@@ -444,34 +444,34 @@ end));
 ))
 
 
-let main : unit  ->  unit = (fun uu____910 -> (FStar_All.try_with (fun uu___481_920 -> (match (()) with
+let main : unit  ->  unit = (fun uu____895 -> (FStar_All.try_with (fun uu___481_905 -> (match (()) with
 | () -> begin
 ((setup_hooks ());
 (
 
-let uu____922 = (FStar_Util.record_time go)
-in (match (uu____922) with
-| (uu____928, time) -> begin
+let uu____907 = (FStar_Util.record_time go)
+in (match (uu____907) with
+| (uu____913, time) -> begin
 (
 
-let uu____932 = ((FStar_Options.print ()) || (FStar_Options.print_in_place ()))
-in (match (uu____932) with
+let uu____917 = ((FStar_Options.print ()) || (FStar_Options.print_in_place ()))
+in (match (uu____917) with
 | true -> begin
 (
 
-let uu____935 = (FStar_ST.op_Bang fstar_files)
-in (match (uu____935) with
+let uu____920 = (FStar_ST.op_Bang fstar_files)
+in (match (uu____920) with
 | FStar_Pervasives_Native.Some (filenames) -> begin
 (
 
 let printing_mode = (
 
-let uu____978 = (FStar_Options.print ())
-in (match (uu____978) with
+let uu____963 = (FStar_Options.print ())
+in (match (uu____963) with
 | true -> begin
 FStar_Prettyprint.FromTempToStdout
 end
-| uu____981 -> begin
+| uu____966 -> begin
 FStar_Prettyprint.FromTempToFile
 end))
 in (FStar_Prettyprint.generate printing_mode filenames))
@@ -480,21 +480,21 @@ end
 ((FStar_Util.print_error "Internal error: List of source files not properly set");
 (
 
-let uu____989 = (FStar_Options.query_stats ())
-in (match (uu____989) with
+let uu____974 = (FStar_Options.query_stats ())
+in (match (uu____974) with
 | true -> begin
 (
 
-let uu____992 = (FStar_Util.string_of_int time)
+let uu____977 = (FStar_Util.string_of_int time)
 in (
 
-let uu____994 = (
+let uu____979 = (
 
-let uu____996 = (FStar_Getopt.cmdline ())
-in (FStar_String.concat " " uu____996))
-in (FStar_Util.print2 "TOTAL TIME %s ms: %s\n" uu____992 uu____994)))
+let uu____981 = (FStar_Getopt.cmdline ())
+in (FStar_String.concat " " uu____981))
+in (FStar_Util.print2 "TOTAL TIME %s ms: %s\n" uu____977 uu____979)))
 end
-| uu____1002 -> begin
+| uu____987 -> begin
 ()
 end));
 (cleanup ());
@@ -502,12 +502,12 @@ end));
 )
 end))
 end
-| uu____1006 -> begin
+| uu____991 -> begin
 ()
 end))
 end));
 )
-end)) (fun uu___480_1010 -> ((handle_error uu___480_1010);
+end)) (fun uu___480_995 -> ((handle_error uu___480_995);
 (FStar_All.exit (Prims.parse_int "1"));
 ))))
 

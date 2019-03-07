@@ -1,0 +1,159 @@
+%{
+open FStar.SMTEncoding.SMTProof
+%}
+
+%token LPAREN RPAREN
+%token PROOF FUNCTION
+%token <string> ID
+%token <bigint> INT
+%token TRUE FALSE
+%token ANNOTATION PATTERN QID
+%token PARAMETRIC
+%token NOT AND OR IMPLIES
+%token EQUAL EQUIV
+%token LEQ LT GEQ GT PLUS TIMES MINUS
+%token FORALL LAMBDA
+%token LET
+%token TERM BOOLEAN STRING INTEGER FUEL
+%token ARBITRARY CONGRUENCE REFLEXIVITY SYMMETRY TRANSITIVITY REACHABILITY GENERALIZATION POSITIVE_NNF NEGATIVE_NNF REWRITING MODUS_PONENS MODUS_PONENS_EQUIV UNIT_RESOLUTION AXIOM THEORY_LEMMA INSTANTIATION SKOLEMIZATION
+%token ARITHMETICS TRIANGLE_INEQUALITY FARKAS_LEMMA
+%token EOF
+
+%start start
+%type <smt_proof_section> start
+
+%%
+
+start:
+  | LPAREN statements RPAREN EOF
+      { $2 }
+
+statements:
+  |
+      { [] }
+  | LPAREN FUNCTION ID LPAREN bindings RPAREN sort RPAREN statements
+      { RawDeclareFun ($3 , $5 , $7) :: $9 }
+  | LPAREN PROOF proof RPAREN statements
+      { RawProof ($3) :: $5 }
+
+bindings:
+  |
+      { [] }
+  | LPAREN ID sort RPAREN bindings
+      { ($2 , $3) :: $5 }
+
+sort:
+  | TERM
+      { Term }
+  | BOOLEAN
+      { Boolean }
+  | STRING
+      { String }
+  | INTEGER
+      { Integer }
+  | FUEL
+      { Fuel }
+
+functor:
+  | AND
+      { Conjunction }
+  | OR
+      { Disjunction }
+  | NOT
+      { Negation }
+  | IMPLIES
+      { Implication }
+  | EQUAL
+      { Equality }
+  | EQUIV
+      { Equivalence }
+  | LEQ
+      { LeqInequality }
+  | LT
+      { LtInequality }
+  | GEQ
+      { GeqInequality }
+  | GT
+      { GtInequality }
+  | PLUS
+      { Addition }
+  | TIMES
+      { Product }
+  | MINUS
+      { Opposite }
+  | ID
+      { Uninterpreted ($1) }
+
+theory:
+  | ARITHMETICS TRIANGLE_INEQUALITY
+      { ArithTriangle }
+  | ARITHMETICS FARKAS_LEMMA
+      { ArithFarkas }
+
+annotations:
+  |
+      { }
+  | PATTERN LPAREN proofs RPAREN annotations
+      { }
+  | QID ID annotations
+      { }
+
+proofs:
+  |
+      { [] }
+  | proof proofs
+      { $1 :: $2 }
+
+proof:
+  | ID
+      { Terminal ($1) }
+  | LPAREN functor proofs RPAREN
+      { Application ($2 , $3) }
+  | LPAREN FORALL LPAREN bindings RPAREN proof RPAREN
+      { Forall ($4 , $6) }
+  | LPAREN LAMBDA LPAREN bindings RPAREN proof RPAREN
+      { Lambda ($4 , $6) }
+  | LPAREN LET LPAREN definitions RPAREN proof RPAREN
+      { Let ($4 , $6) }
+  | INT
+      { IntegerConst($1) }
+  | TRUE
+      { BooleanConst(true) }
+  | FALSE
+      { BooleanConst(false) }
+  | LPAREN ARBITRARY proof proof RPAREN
+      { Arbitrary ($3 , $4) }
+  | LPAREN CONGRUENCE proofs proof RPAREN
+      { Congruence ($3 , $4) }
+  | LPAREN REFLEXIVITY proof RPAREN
+      { Reflexivity ($3) }
+  | LPAREN SYMMETRY proof proof RPAREN
+      { Symmetry ($3 , $4) }
+  | LPAREN TRANSITIVITY proof proof proof RPAREN
+      { Transitivity ($3 , $4 , $5) }
+  | LPAREN REACHABILITY proofs proof RPAREN
+      { Reachability ($3 , $4) }
+  | LPAREN GENERALIZATION proof RPAREN
+      { Generalization ($3) }
+  | LPAREN LPAREN PARAMETRIC INSTANTIATION proof RPAREN proof RPAREN
+      { Instantiation ($5 , $7) }
+  | LPAREN REWRITE proof RPAREN
+      { Rewrite ($3) }
+  | LPAREN MODUS_PONENS proof proof proof RPAREN
+      { ModusPonens ($3 , $4 , $5) }
+  | LPAREN MODUS_PONENS_EQUIV proof proof proof RPAREN
+      { ModusPonensEquiv ($3 , $4 , $5) }
+  | LPAREN SKOLEMIZATION proof RPAREN
+      { Skolemization ($3) }
+  | LPAREN POSITIVE_NNF proofs RPAREN
+      { PositiveNnf }
+  | LPAREN NEGATIVE_NNF proofs RPAREN
+      { NegativeNnf }
+  | LPAREN UNIT_RESOLUTION proofs RPAREN
+      { UnitResolution }
+  | LPAREN ASSERTED proof RPAREN
+      { Asserted ($3) }
+  | LPAREN LPAREN PARAMETRIC THEORY_LEMMA theory RPAREN proofs RPAREN
+      { TheoryLemma ($5 , $7) }
+  | LPAREN ANNOTATION proof annotations RPAREN
+
