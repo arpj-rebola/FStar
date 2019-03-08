@@ -1,4 +1,4 @@
-module Trivial
+module Recursive
 
 let f (x:nat) = x + 1
 
