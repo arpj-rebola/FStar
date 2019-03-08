@@ -179,7 +179,7 @@ let read_and_signal (p : proc) (buf : Buffer.t) (stop : bool)
         let buffer : Buffer.t = if filter_main line then buf else p.aux_buffer in
         if not (stop_marker line) then (Buffer.add_string buffer (line ^ "\n"); loop ()) else ()
     in
-    (try loop () with
+    (print_string "<reading>\n" ; try loop () with
       | SigInt -> result := Some SIGINT
       | End_of_file ->  result := Some EOF) ;
     signal ()
