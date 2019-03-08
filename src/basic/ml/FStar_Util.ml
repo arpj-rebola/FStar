@@ -175,6 +175,7 @@ let read_and_signal (p : proc) (buf : Buffer.t) (stop : bool)
     let filter_main : string -> bool = if filter then p.main_filter else (fun s -> true) in
     let rec loop () : unit =
         let line : string = BatString.trim (input_line p.inc) in
+        print_string (line ^ "\n") ;
         let buffer : Buffer.t = if filter_main line then buf else p.aux_buffer in
         if not (stop_marker line) then (Buffer.add_string buffer (line ^ "\n"); loop ()) else ()
     in
@@ -269,7 +270,9 @@ let kill_process (p : proc) : string =
       (* Avoid zombie processes (Unix.close_process does the same thing. *)
       waitpid_ignore_signals p.pid;
       let out = (try
+          (* print_string "[Z3 final start]\n" ; *)
           process_read_async p None (read_and_signal p discard false true result) ;
+          (* print_string "[Z3 final end]\n" ; *)
           (match !result with
           | None
           | Some EOF -> ()

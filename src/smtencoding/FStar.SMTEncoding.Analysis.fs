@@ -222,19 +222,20 @@ let tabular_profile (q : psmap<qiprofile>) : list<(list<string>)> =
     List.fold_left qid_to_rows []
     
 let qiprofile_analysis (queries : list<(query_info * list<decl>)>) (qiprofile_output : string) : unit =
-    match queries with
-        | [] -> ()
-        | _ -> 
-            let q : psmap<qiprofile> = profile_quantifiers queries qiprofile_output in
-            let tab : list<(list<string>)> = tabular_profile q in
-            let fmt : list<pretty_alignment> = [PrettyRight ; PrettyRight ; PrettyLeft ; PrettyRight ; PrettyLeft] in
-            let (content_string , content_length) : string * int = prettyprint_table fmt tab in
-            let (header_string , header_length) : string * int =
-                let headers : list<string> = queries |> List.map (fun ((q , ds) : query_info * list<decl>) -> query_name q) in
-                String.concat "\n" headers , List.fold_left (fun (x : int) (s : string) -> max x (String.length s)) 0 headers
-            in
-            let line : string = repeat (max content_length header_length) "-" in
-            print (line ^ "\n" ^ header_string ^ "\n" ^ line ^ "\n" ^ content_string ^ "\n" ^ line ^ "\n\n" ) []
+    ()
+    // match queries with
+    //     | [] -> ()
+    //     | _ -> 
+    //         let q : psmap<qiprofile> = profile_quantifiers queries qiprofile_output in
+    //         let tab : list<(list<string>)> = tabular_profile q in
+    //         let fmt : list<pretty_alignment> = [PrettyRight ; PrettyRight ; PrettyLeft ; PrettyRight ; PrettyLeft] in
+    //         let (content_string , content_length) : string * int = prettyprint_table fmt tab in
+    //         let (header_string , header_length) : string * int =
+    //             let headers : list<string> = queries |> List.map (fun ((q , ds) : query_info * list<decl>) -> query_name q) in
+    //             String.concat "\n" headers , List.fold_left (fun (x : int) (s : string) -> max x (String.length s)) 0 headers
+    //         in
+    //         let line : string = repeat (max content_length header_length) "-" in
+    //         print (line ^ "\n" ^ header_string ^ "\n" ^ line ^ "\n" ^ content_string ^ "\n" ^ line ^ "\n\n" ) []
 
 
 // type quantifier_info = {
