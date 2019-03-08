@@ -175,11 +175,10 @@ let read_and_signal (p : proc) (buf : Buffer.t) (stop : bool)
     let filter_main : string -> bool = if filter then p.main_filter else (fun s -> true) in
     let rec loop () : unit =
         let line : string = BatString.trim (input_line p.inc) in
-        print_string (line ^ "\n") ;
         let buffer : Buffer.t = if filter_main line then buf else p.aux_buffer in
         if not (stop_marker line) then (Buffer.add_string buffer (line ^ "\n"); loop ()) else ()
     in
-    (print_string "<reading>\n" ; try loop () with
+    (try loop () with
       | SigInt -> result := Some SIGINT
       | End_of_file ->  result := Some EOF) ;
     signal ()
@@ -261,17 +260,16 @@ let ask_process
 
 let kill_process (p : proc) : string =
   if not p.killed then begin
-      print_string "<kill_process start>"
       let result = ref None in
       let discard = Buffer.create 16 in
-      (try Unix.kill p.pid Sys.sigkill
-       with Unix.Unix_error (Unix.ESRCH, _, _) -> ());
+      Unix.close (Unix.descr_of_out_channel p.outc);
+      (* ARP : commenting this out - kill closes the channels, and I need them open to read the final QI output *)
+      (* (try Unix.kill p.pid Sys.sigkill
+       with Unix.Unix_error (Unix.ESRCH, _, _) -> ()); *)
       (* Avoid zombie processes (Unix.close_process does the same thing. *)
       waitpid_ignore_signals p.pid;
       let out = (try
-          (* print_string "[Z3 final start]\n" ; *)
           process_read_async p None (read_and_signal p discard false true result) ;
-          (* print_string "[Z3 final end]\n" ; *)
           (match !result with
           | None
           | Some EOF -> ()
@@ -281,7 +279,6 @@ let kill_process (p : proc) : string =
       (* Close the fds directly: close_in and close_out both call `flush`,
          potentially forcing us to wait until p starts reading again *)
       Unix.close (Unix.descr_of_in_channel p.inc);
-      Unix.close (Unix.descr_of_out_channel p.outc);
       p.killed <- true ;
       out
     end

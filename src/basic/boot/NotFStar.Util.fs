@@ -114,7 +114,6 @@ let start_process (id : string) (prog : string) (args : list<string>) (cond : st
     proc.EnableRaisingEvents <- true;
     let output_handler _ (args:DataReceivedEventArgs) =
       let buffer : StringBuilder = if args.Data = null || main args.Data then mainBuffer else auxBuffer in
-      if args.Data <> null then Console.WriteLine(args.Data) ;
       ignore <| buffer.Append (args.Data) ;
       ignore <| buffer.Append ("\n") ;
       if not !killed then

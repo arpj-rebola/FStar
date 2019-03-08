@@ -735,7 +735,55 @@ end)))))
 in (FStar_All.pipe_right uu____3427 (FStar_List.fold_left qid_to_rows [])))))))
 
 
-let qiprofile_analysis : (query_info * FStar_SMTEncoding_Term.decls_t) Prims.list  ->  Prims.string  ->  unit = (fun queries qiprofile_output -> ())
+let qiprofile_analysis : (query_info * FStar_SMTEncoding_Term.decls_t) Prims.list  ->  Prims.string  ->  unit = (fun queries qiprofile_output -> (match (queries) with
+| [] -> begin
+()
+end
+| uu____3593 -> begin
+(
+
+let q = (profile_quantifiers queries qiprofile_output)
+in (
+
+let tab = (tabular_profile q)
+in (
+
+let fmt = (PrettyRight)::(PrettyRight)::(PrettyLeft)::(PrettyRight)::(PrettyLeft)::[]
+in (
+
+let uu____3614 = (prettyprint_table fmt tab)
+in (match (uu____3614) with
+| (content_string, content_length) -> begin
+(
+
+let uu____3627 = uu____3614
+in (
+
+let uu____3634 = (
+
+let headers = (FStar_All.pipe_right queries (FStar_List.map (fun uu____3666 -> (match (uu____3666) with
+| (q1, ds) -> begin
+(query_name q1)
+end))))
+in (
+
+let uu____3680 = (FStar_List.fold_left (fun x s -> (max x (FStar_String.length s))) (Prims.parse_int "0") headers)
+in (((FStar_String.concat "\n" headers)), (uu____3680))))
+in (match (uu____3634) with
+| (header_string, header_length) -> begin
+(
+
+let uu____3700 = uu____3634
+in (
+
+let line = (
+
+let uu____3709 = (max content_length header_length)
+in (FStar_Util.repeat uu____3709 "-"))
+in (FStar_Util.print (Prims.strcat line (Prims.strcat "\n" (Prims.strcat header_string (Prims.strcat "\n" (Prims.strcat line (Prims.strcat "\n" (Prims.strcat content_string (Prims.strcat "\n" (Prims.strcat line "\n\n"))))))))) [])))
+end)))
+end)))))
+end))
 
 
 
