@@ -13,7 +13,7 @@ type sort =
     | Integer
     | Term
 
-type functor =
+type operator =
     | Conjunction
     | Disjunction
     | Negation
@@ -35,7 +35,7 @@ type theory_lemma =
 
 type raw_proof =
     | Terminal of string
-    | Application of functor * list<raw_proof>
+    | Application of operator * list<raw_proof>
     | Forall of list<(string * sort)> * raw_proof
     | Lambda of list<(string * sort)> * raw_proof
     | Let of list<(string * raw_proof)> * raw_proof

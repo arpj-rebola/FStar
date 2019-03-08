@@ -29,14 +29,14 @@ let prettyprint_table (fmt : list<pretty_alignment>) (tab : list<(list<string>)>
             let spl : list<string> = split s sep in
             ((List.hd spl) ^ sep , List.tl spl |> String.concat sep)
     in
-    let measure (align : pretty_alignment) ((l , r) : (int * int)) (s : string) : (int * int) =
+    let len (align : pretty_alignment) ((l , r) : (int * int)) (s : string) : (int * int) =
         let (ls , rs) : (string * string) = mark_split align s in
         let (lx , rx) : (int * int) = (String.length ls , String.length rs) in
         ((max l lx) , (max r rx))
     in
     let rec maxlength (fmt : list<pretty_alignment>) (ln : list<(int * int)>) (row : list<string>) : list<(int * int)> = match (fmt , ln , row) with
         | (fmt_hd :: fmt_tl , ln_hd :: ln_tl , row_hd :: row_tl) ->
-            (measure fmt_hd ln_hd row_hd) :: (maxlength fmt_tl ln_tl row_tl)
+            (len fmt_hd ln_hd row_hd) :: (maxlength fmt_tl ln_tl row_tl)
         | _ -> []
     in
     let maxlength_init : list<(int * int)> = tabulate (List.length fmt) (fun _ -> (0 , 0)) in

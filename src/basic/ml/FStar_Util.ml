@@ -548,6 +548,9 @@ let is_upper c = 65 <= c && c <= 90
 let contains (s1:string) (s2:string) = BatString.exists s1 s2
 let substring_from s index = BatString.tail s (Z.to_int index)
 let substring s i j = BatString.sub s (Z.to_int i) (Z.to_int j)
+let repeat (k : Z.t) (s : string) : string =
+  let rec aux (n : int) (o : string) : string = if n > 0 then aux (n - 1) (o ^ s) else o in
+  aux (Z.to_int k) ""
 let replace_char (s:string) c1 c2 =
   let c1, c2 = BatUChar.chr c1, BatUChar.chr c2 in
   BatUTF8.map (fun x -> if x = c1 then c2 else x) s
@@ -692,6 +695,17 @@ let choose_map f state s =
     | state, Some v -> (state, v :: acc) in
   let (state, rs) = BatList.fold_left fold (state, []) s in
   (state, BatList.rev rs)
+
+let collect_some l =
+  let rec aux i o =
+    match i with
+      | hd :: tl ->
+        (match hd with
+          | Some x -> aux tl (x :: o)
+          | None -> o)
+      | [] -> BatList.rev o
+  in
+    aux l []
 
 let for_all f l = BatList.for_all f l
 let for_some f l = BatList.exists f l
