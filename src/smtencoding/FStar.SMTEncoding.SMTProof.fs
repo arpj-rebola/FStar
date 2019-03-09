@@ -269,5 +269,3 @@ let topify (proof : raw_proof) : list<parametric_let> =
     let (pf , ls) : raw_proof * list<parametric_let> = aux [] proof [] in
     let last_let : parametric_let = ("!!proof!!" , [] , pf) in
     List.rev (last_let :: ls)
-
-        

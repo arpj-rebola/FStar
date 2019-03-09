@@ -178,6 +178,22 @@ let profile_quantifiers (queries : list<(query_info * list<decl>)>) (qiprofile_o
             | [] -> []
             | (s , q) :: tl -> List.rev (aux tl s [q] [])
     in
+    let remove_duplicates (l : list<quantifier_info>) : list<quantifier_info> =
+        let equal_range (q1 : quantifier_info) (q2 : quantifier_info) : bool =
+            (quantifier_file q1 = quantifier_file q2) && (quantifier_range q1 = quantifier_range q2)
+        in
+        let rec rm (q : quantifier_info) (i : list<quantifier_info>) (o : list<quantifier_info>) : list<quantifier_info> =
+            match i with
+                | hd :: tl -> rm q tl (if equal_range hd q then o else hd :: o)
+                | [] -> List.rev o
+        in
+        let rec aux (i : list<quantifier_info>) (o : list<quantifier_info>) =
+            match i with
+                | hd :: tl -> aux (rm hd i []) (hd :: o)
+                | [] -> List.rev o
+        in
+        aux l []
+    in
     let qip : qiprofile_map = parse_qiprofile qiprofile_output in
     let insert (o : psmap<qiprofile>) ((id , info) : string * list<quantifier_info>) : psmap<qiprofile> =
         let (inst , gen , cost) : (int * int * int) = match psmap_try_find qip id with
@@ -196,6 +212,7 @@ let profile_quantifiers (queries : list<(query_info * list<decl>)>) (qiprofile_o
     List.collect extract_quantifiers queries |> 
     sort_with comp |>
     conflate |>
+    List.map (fun ((s , q) : string * list<quantifier_info>) -> (s , remove_duplicates q)) |>
     List.fold_left insert (psmap_empty ())
 
 let tabular_profile (q : psmap<qiprofile>) : list<(list<string>)> =
