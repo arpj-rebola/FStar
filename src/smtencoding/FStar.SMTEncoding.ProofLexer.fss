@@ -2,9 +2,8 @@
 
 module FStar.SMTEncoding.ProofLexer
 
-open Microsoft.FSharp.Text.Lexing
+open FStar.Parser.Util
 open System
-open System.Numerics
 open FStar.SMTEncoding.ProofParser
 
 let keywords =
@@ -58,8 +57,6 @@ let keywords =
       "triangle-eq" , TRIANGLE_INEQUALITY;
       "farkas", FARKAS_LEMMA ] |> Map.ofList
 
-let lexeme (lexbuf : LexBuffer<char>) = new System.String(lexbuf.Lexeme)
-
 }
 
 let digit = ['0'-'9']
@@ -76,7 +73,7 @@ rule tokenize = parse
 | newline { lexbuf.EndPos <- lexbuf.EndPos.NextLine; tokenize lexbuf }
 | whitespace { tokenize lexbuf }
 | comment { tokenize lexbuf }
-| int { INT(BigInteger.Parse(lexeme lexbuf)) }
+| int { INT(lexeme lexbuf) }
 | symbol { match keywords.TryFind(lexeme lexbuf) with   
                | Some(token) -> token   
                | None -> ID(lexeme lexbuf)

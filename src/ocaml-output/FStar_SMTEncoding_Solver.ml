@@ -524,7 +524,7 @@ let uu____1712 = (
 
 let uu____1715 = (
 
-let uu____1718 = ((FStar_Options.record_hints ()) || (FStar_Options.analyze_proof ()))
+let uu____1718 = ((FStar_Options.record_hints ()) || (FStar_Options.smt_proof ()))
 in (match (uu____1718) with
 | true -> begin
 (FStar_SMTEncoding_Term.GetUnsatCore)::[]
@@ -538,7 +538,7 @@ let uu____1725 = (
 
 let uu____1728 = (
 
-let uu____1731 = (FStar_Options.analyze_proof ())
+let uu____1731 = (FStar_Options.smt_proof ())
 in (match (uu____1731) with
 | true -> begin
 (FStar_SMTEncoding_Term.GetProof)::[]

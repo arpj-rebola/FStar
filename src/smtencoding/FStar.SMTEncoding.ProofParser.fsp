@@ -1,11 +1,13 @@
 %{
+#light "off"
 open FStar.SMTEncoding.SMTProof
+open FStar.Util
 %}
 
 %token LPAREN RPAREN
 %token PROOF FUNCTION
 %token <string> ID
-%token <bigint> INT
+%token <string> INT
 %token TRUE FALSE
 %token ANNOTATION PATTERN QID
 %token PARAMETRIC
@@ -25,16 +27,25 @@ open FStar.SMTEncoding.SMTProof
 %%
 
 start:
-  | LPAREN statements RPAREN EOF
-      { $2 }
+  | LPAREN functiondeclarations refutation RPAREN EOF
+      { ($2 , $3) }
 
-statements:
+functiondeclarations:
   |
       { [] }
-  | LPAREN FUNCTION ID LPAREN bindings RPAREN sort RPAREN statements
-      { RawDeclareFun ($3 , $5 , $7) :: $9 }
-  | LPAREN PROOF proof RPAREN statements
-      { RawProof ($3) :: $5 }
+  | LPAREN FUNCTION ID LPAREN signature RPAREN sort RPAREN functiondeclarations
+      { ($3 , $5 , $7) :: $9 }
+
+refutation:
+  | LPAREN PROOF proof RPAREN
+      { $3 }
+
+
+signature:
+  |
+      { [] }
+  | sort signature
+      { $1 :: $2 }
 
 bindings:
   |
@@ -54,7 +65,7 @@ sort:
   | FUEL
       { Fuel }
 
-functor:
+operator:
   | AND
       { Conjunction }
   | OR
@@ -100,9 +111,9 @@ annotations:
 
 definitions:
   |
-      { }
+      { [] }
   | LPAREN ID proof RPAREN definitions
-      { ($2 , $3) }
+      { ($2 , $3) :: $5 }
 
 proofs:
   |
@@ -113,7 +124,7 @@ proofs:
 proof:
   | ID
       { Terminal ($1) }
-  | LPAREN functor proofs RPAREN
+  | LPAREN operator proofs RPAREN
       { Application ($2 , $3) }
   | LPAREN FORALL LPAREN bindings RPAREN proof RPAREN
       { Forall ($4 , $6) }
@@ -122,7 +133,7 @@ proof:
   | LPAREN LET LPAREN definitions RPAREN proof RPAREN
       { Let ($4 , $6) }
   | INT
-      { IntegerConst($1) }
+      {IntegerConst (int_of_string $1)}
   | TRUE
       { BooleanConst(true) }
   | FALSE

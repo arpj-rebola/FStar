@@ -187,34 +187,35 @@ let free_variables t = match !t.freevars with
     fvs
 
 let rec assign_qids (d : decl) : unit =
-  let in_terms (nm : string) (t : term) : unit =
-      let next_qid : unit -> string =
-          let ctr : ref<int> = BU.mk_ref 0 in
-          fun (_ : unit) ->
-              let n : int = !ctr in
-              BU.incr ctr;
-              if n = 0 then nm
-              else BU.format2 "%s.%s" nm (BU.string_of_int n)
-      in
-      let set_qid (qid : Syntax.memo<string>) : unit = match !qid with
-          | None -> qid := Some (next_qid ())
-          | Some s -> ()
-      in
-      let rec aux (tm : term) : unit = match tm.tm with
-          | App (op , tms) -> List.iter aux tms
-          | Quant (_ , _ , _ , _ , scp , qid) ->
-              set_qid (qid) ;
-              aux scp
-          | _ -> ()
-      in
-      aux t
-  in
-  match d with
-      | DefineFun (nm , _ , _ , tm , _) -> 
-          in_terms ("funqid_" ^ nm) tm
-      | Assume a -> in_terms a.assumption_name a.assumption_term
-      | Module (_ , ds) -> List.iter assign_qids ds
-      | _ -> ()
+    let in_terms (nm : string) (t : term) : unit =
+        let set_qid (qid : Syntax.memo<string>) (n : int) : int =
+            match !qid with
+                | Some _ -> n
+                | None ->
+                    qid := Some (nm ^ "." ^ (string_of_int n)) ;
+                    n + 1
+        in
+        let rec aux (n : int) (tx : term) : int =
+            match tx.tm with
+                | App (_ , tms) -> List.fold_left aux n tms
+                | Quant (_ , _ , _ , _ , scp , qid) ->
+                    let nx : int = set_qid qid n in
+                    aux nx scp
+                | Let (tms , scp) ->
+                    let nx : int = List.fold_left aux n tms in
+                    aux nx scp
+                | Labeled (scp , _ , _)
+                | LblPos (scp, _) -> aux n scp
+                | _ -> n
+
+        in
+        aux 0 t |> ignore
+    in
+    match d with
+        | DefineFun (nm , _ , _ , tm , _) -> in_terms ("funqid_" ^ nm) tm
+        | Assume a -> in_terms a.assumption_name a.assumption_term
+        | Module (_ , ds) -> List.iter assign_qids ds
+        | _ -> ()
 
 (*****************************************************)
 (* Pretty printing terms and decls in SMT Lib format *)
@@ -685,9 +686,7 @@ let name_macro_binders (sorts : list<sort>) : list<fv> * list<string> =
     let (names , binders , n) : list<(string * sort)> * list<string> * int = name_binders_inner (Some "__") [] 0 sorts in
     List.rev names, binders
 
-let termToSmt
-  : print_ranges:bool -> enclosing_name:string -> t:term -> string
-  =
+let termToSmt : bool -> string -> term -> string =
   fun (print_ranges : bool) (enclosing_name : string) (t : term) ->
       // let next_qid : unit -> string =
       //     let ctr : ref<int> = BU.mk_ref 0 in
@@ -705,66 +704,68 @@ let termToSmt
             | App(Var "Prims.guard_free", [p]) -> p
             | _ -> tm))
       in
-      let rec aux' (depth : int) (n : int) (names:list<fv>) (t : term) =
-        let aux : int -> list<fv> -> term -> string = aux (depth + 1) in
-        match t.tm with
-        | Integer i     -> i
-        | BoundV i ->
-          List.nth names i |> fst
-        | FreeV x -> fst x
-        | App(op, []) -> op_to_string op
-        | App(op, tms) -> BU.format2 "(%s %s)" (op_to_string op) (List.map (aux n names) tms |> String.concat "\n")
-        | Labeled(t, _, _) -> aux n names t
-        | LblPos(t, s) -> BU.format2 "(! %s :lblpos %s)" (aux n names t) s
-        | Quant(qop, pats, wopt, sorts, body, qid) ->
-          // let qid : string = next_qid () in
-          let qidstr : string = match !qid with
-              | None -> failwith "no qid was assigned"
-              | Some str -> str
-          in
-          let names , binders , n : list<fv> *  list<string> * int = name_binders_inner None names n sorts in
-          let binders : string = binders |> String.concat " " in
-          let pats : list<list<pat>> = remove_guard_free pats in
-          let pats_str : string =
-            match pats with
-            | [[]]
-            | [] -> ";;no pats"
-            | _ ->
-              pats
-              |> List.map (fun (pats : list<pat>) ->
-                format1 "\n:pattern (%s)" (String.concat " " (List.map (fun (p : pat) ->
-                  format1 "%s" (aux n names p)) pats)))
-              |> String.concat "\n"
-          in
-          BU.format "(%s (%s)\n (! %s\n %s\n%s\n:qid %s))"
-                    [qop_to_string qop;
-                     binders;
-                     aux n names body;
-                     weightToSmt wopt;
-                     pats_str;
-                     qidstr]
+      let rec aux' (depth : int) (n : int) (names:list<fv>) (t : term) : string =
+          let aux : int -> list<fv> -> term -> string = aux (depth + 1) in
+          match t.tm with
+          | Integer i     -> i
+          | BoundV i -> List.nth names i |> fst
+          | FreeV x -> fst x
+          | App(op, []) -> op_to_string op
+          | App(op, tms) -> BU.format2 "(%s %s)" (op_to_string op) (List.map (aux n names) tms |> String.concat "\n")
+          | Labeled(t, _, _) -> aux n names t
+          | LblPos(t, s) -> BU.format2 "(! %s :lblpos %s)" (aux n names t) s
+          | Quant(qop, pats, wopt, sorts, body, qid) ->
+              // let qid : string = next_qid () in
+              let qidstr : string = match !qid with
+                  | None -> "no-qid"
+                  | Some str -> str
+              in
+            let (names , binders , n) : list<fv> *  list<string> * int = name_binders_inner None names n sorts in
+            let binders : string = binders |> String.concat " " in
+            let pats : list<list<pat>> = remove_guard_free pats in
+            let pats_str : string =
+                match pats with
+                | [[]]
+                | [] -> ";;no pats"
+                | _ ->
+                    pats
+                    |> List.map (fun (pats : list<pat>) ->
+                        format1 "\n:pattern (%s)" (String.concat " " (List.map (fun (p : pat) ->
+                            format1 "%s" (aux n names p)) pats)))
+                    |> String.concat "\n"
+            in
+            let res : string = BU.format "(%s (%s)\n (! %s\n %s\n%s\n:qid %s))"
+                      [qop_to_string qop;
+                       binders;
+                       aux n names body;
+                       weightToSmt wopt;
+                       pats_str;
+                       qidstr]
+            in
+            if not (BU.is_some !qid) then print ("Missing QID:\n" ^ res ^ "\n\n") [];
+            res
 
-        | Let (es, body) ->
-          (* binders are reversed but according to the smt2 standard *)
-          (* substitution should occur in parallel and order should not matter *)
-          let (names , binders , n) : list<fv> * list<string> * int =
-            List.fold_left (fun ((names0 , binders , n0) : list<fv> * list<string> * int) (e : term) ->
-              let nm : string = "@lb" ^ string_of_int n0 in
-              let names0 : list<fv> = (nm, Term_sort)::names0 in
-              let b : string = BU.format2 "(%s %s)" nm (aux n names e) in
-              names0, b::binders, n0+1)
-            (names, [], n)
-            es
-          in
-          BU.format2 "(let (%s)\n%s)"
-                     (String.concat " " binders)
-                     (aux n names body)
+          | Let (es, body) ->
+              (* binders are reversed but according to the smt2 standard *)
+              (* substitution should occur in parallel and order should not matter *)
+              let (names , binders , n) : list<fv> * list<string> * int =
+                  List.fold_left (fun ((names0 , binders , n0) : list<fv> * list<string> * int) (e : term) ->
+                      let nm : string = "@lb" ^ string_of_int n0 in
+                      let names0 : list<fv> = (nm, Term_sort)::names0 in
+                      let b : string = BU.format2 "(%s %s)" nm (aux n names e) in
+                      names0, b::binders, n0+1)
+                  (names, [], n)
+                es
+              in
+              BU.format2 "(let (%s)\n%s)"
+                         (String.concat " " binders)
+                         (aux n names body)
 
       and aux (depth : int) (n : int) (names : list<fv>) (t : term) : string =
-        let s : string = aux' depth n names t in
-        if print_ranges && t.rng <> norng && t.rng <> prrng
-        then BU.format3 "\n;; def=%s; use=%s\n%s\n" (Range.string_of_range t.rng) (Range.string_of_use_range t.rng) s
-        else s
+          let s : string = aux' depth n names t in
+          if print_ranges && t.rng <> norng && t.rng <> prrng
+          then BU.format3 "\n;; def=%s; use=%s\n%s\n" (Range.string_of_range t.rng) (Range.string_of_use_range t.rng) s
+          else s
       in
       aux 0 0 [] t
 

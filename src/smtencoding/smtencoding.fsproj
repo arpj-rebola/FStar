@@ -77,9 +77,6 @@
     <Compile Include="FStar.SMTEncoding.Encode.fs" />
     <Compile Include="FStar.SMTEncoding.Solver.fsi" />
     <Compile Include="FStar.SMTEncoding.Solver.fs" />
-    <FsYacc Include="FStar.SMTEncoding.ProofParser.fsp" />
-    <FsLex Include="FStar.SMTEncoding.ProofLexer.fss" />
-    <Compile Include="FStar.SMTEncoding.SMTProof.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

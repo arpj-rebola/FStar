@@ -143,7 +143,7 @@ let rec extract_quantifiers_from_decls (query : query_info) (decl : decl) : list
                         quantifier_info_query = query ;
                         quantifier_info_quantifier = tm ;
                         quantifier_info_context = context }) :: (aux t)
-                | None -> failwith "No QID found"
+                | None -> print "No QID found in SMT declaration\n" [] ; aux t
             end
             | Let (tms , t) -> (aux t) @ (List.collect aux tms)
             | Labeled (t , _ , _)

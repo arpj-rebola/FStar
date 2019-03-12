@@ -267,7 +267,8 @@ let defaults =
       ("warn_error"                   , String "");
       ("use_extracted_interfaces"     , Bool false);
       ("use_nbe"                      , Bool false);
-      ("analyze_proof"                , Bool false)]
+      ("report_qi"                    , Bool false);
+      ("smt_proof"                    , Bool false) ]
 
 let init () =
    let o = peek () in
@@ -392,7 +393,8 @@ let get_ml_no_eta_expand_coertions ()   = lookup_opt "__ml_no_eta_expand_coertio
 let get_warn_error              ()      = lookup_opt "warn_error"               (as_string)
 let get_use_extracted_interfaces ()     = lookup_opt "use_extracted_interfaces" as_bool
 let get_use_nbe                 ()      = lookup_opt "use_nbe"                  as_bool
-let get_analyze_proof           ()      = lookup_opt "analyze_proof"            as_bool
+let get_report_qi               ()      = lookup_opt "report_qi"                as_bool
+let get_smt_proof               ()      = lookup_opt "smt_proof"                as_bool
 
 let dlevel = function
    | "Low" -> Low
@@ -1132,11 +1134,16 @@ let rec specs_with_types () : list<(char * string * opt_type * string)> =
                                 (Const (mk_bool true))),
         // "Display this information")]
         "Display this information");
-        
+
        ( noshort,
-        "analyze_proof",
+        "report_qi",
         Const (mk_bool true),
-        "Analyzes proofs and quantifier instantiations obtained from Z3") ]
+        "Generates a quantifier instantiation report every time Z3 is closed") ;
+
+       ( noshort,
+        "smt_proof",
+        Const (mk_bool true),
+        "Extracts an SMT proof from Z3") ]
 
 and specs () : list<FStar.Getopt.opt> = // FIXME: Why does the interactive mode log the type of opt_specs_with_types as a triple??
   List.map (fun (short, long, typ, doc) ->
@@ -1522,7 +1529,8 @@ let ml_no_eta_expand_coertions   () = get_ml_no_eta_expand_coertions  ()
 let warn_error                   () = get_warn_error                  ()
 let use_extracted_interfaces     () = get_use_extracted_interfaces    ()
 let use_nbe                      () = get_use_nbe                     ()
-let analyze_proof                () = get_analyze_proof               ()
+let report_qi                    () = get_report_qi                   ()
+let smt_proof                    () = get_smt_proof                   ()
 
 let with_saved_options f =
   // take some care to not mess up the stack on errors

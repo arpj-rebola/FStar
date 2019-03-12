@@ -113,8 +113,9 @@ let ini_params () : list<string> =
   check_z3hash () ;
   let args : list<string> = ["-smt2"; "-in"; Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))] in
   let opts : list<string> = Options.z3_cliopt () in
-  let proof : list<string> = if Options.analyze_proof () then ["proof=true" ; "smt.qi.profile=true"] else [] in
-  args @ opts @ proof
+  let qi : list<string> = if Options.report_qi () then ["smt.qi.profile=true"] else [] in
+  let proof : list<string> = if Options.smt_proof () then ["proof=true"] else [] in
+  args @ opts @ qi @ proof
 
 type label = string
 type unsat_core = option<list<string>>
@@ -125,13 +126,6 @@ type z3status =
     | UNKNOWN of error_labels * option<string>         //error labels
     | TIMEOUT of error_labels * option<string>         //error labels
     | KILLED
-
-// type qi_info = {
-//     instances       : int ;
-//     max_generation  : int ;
-//     max_cost        : int }
-
-// type qi_profile = psmap<qi_info>
 
 type z3statistics = BU.smap<string>
 
@@ -151,7 +145,7 @@ let status_string_and_errors (s : z3status) : string * list<error_label> = match
 
 let tid () : string = BU.current_tid() |> BU.string_of_int
 let new_z3proc (id : string) : BU.proc =
-    let filter : string -> bool = if Options.analyze_proof () then (fun s -> not (BU.starts_with s "[quantifier_instances]")) else (fun s -> true) in
+    let filter : string -> bool = if Options.report_qi () then (fun s -> not (BU.starts_with s "[quantifier_instances]")) else (fun s -> true) in
     BU.start_process id (Options.z3_exe ()) (ini_params ()) (fun s -> s = "Done!") filter
 
 type bgproc = {
@@ -340,7 +334,7 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
     let reason_unknown, lines : option<smt_output_section> * list<string> = find_section "reason-unknown" lines in
     let unsat_core, lines : option<smt_output_section> * list<string> = find_section "unsat-core" lines in
     let refutation, lines : option<smt_output_section> * list<string> = 
-        if Options.analyze_proof () then
+        if Options.smt_proof () then
             find_section "proof" lines
         else
             None , lines
@@ -445,9 +439,9 @@ let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (
       (!bg_z3_proc).ask input
   in
   let (status , statistics) : z3status * z3statistics = parse (BU.trim_string stdout) in
-  if Options.analyze_proof () then begin
+  if Options.report_qi () then begin
     match status with
-      | UNSAT (_ , _) -> if fresh then failwith "Option --analyze_proof is incompatible with multi-core solving" else (!bg_z3_proc).store info decls
+      | UNSAT (_ , _) -> if fresh then failwith "Option --report_qi is incompatible with multi-core solving" else (!bg_z3_proc).store info decls
       | _ -> ()
   end ;
   (status , statistics)
@@ -475,6 +469,7 @@ type z3result = {
       z3result_time        : int;
       z3result_statistics  : z3statistics;
       z3result_query_hash  : option<string> ;
+      z3result_query_decls : list<decl> ;
 }
 
 type z3job = job_t<z3result>
@@ -493,10 +488,12 @@ let z3_job (r : query_info) (fresh : bool) (label_messages:error_labels) (input 
       raise e
   in
   let _, elapsed_time : float * int = BU.time_diff start (BU.now()) in
+  let ds : list<decl> = if Options.smt_proof () then decls else [] in
   { z3result_status     = status;
     z3result_time       = elapsed_time;
     z3result_statistics = statistics;
-    z3result_query_hash = qhash ; }
+    z3result_query_hash = qhash ;
+    z3result_query_decls = ds ; }
 
 let running : ref<bool> = BU.mk_ref false
 
@@ -630,7 +627,7 @@ let refresh () =
         let query_data : list<(query_info * list<decl>)> = (!bg_z3_proc).extract () in
         let qip_output : string = (!bg_z3_proc).refresh () in
         reset_scope () ;
-        if Options.analyze_proof () then qiprofile_analysis query_data qip_output else ()
+        if Options.report_qi () then qiprofile_analysis query_data qip_output else ()
 
 let mk_input (theory : list<decl>) : string * option<string> =
     let options : string = !z3_options in
@@ -682,6 +679,7 @@ let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb
               z3result_time = 0;
               z3result_statistics = stats ;
               z3result_query_hash = qhash ;
+              z3result_query_decls = [] ;
             } in
             cb result;
             true
@@ -693,7 +691,7 @@ let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb
 let ask_1_core (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache:option<string>)
             (label_messages:error_labels) (qry:decls_t) (cb:cb) : unit =
     let cumm_theory : decls_t =
-        if Options.analyze_proof () then (cummulative_scope ())@[Push]@qry@[Pop] else []
+        if Options.report_qi () then (cummulative_scope ())@[Push]@qry@[Pop] else []
     in
     let incr_theory : decls_t = (incremental_scope ())@[Push]@qry@[Pop] in
     clear_scope () ;
@@ -710,7 +708,7 @@ let ask_n_cores (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache
     in
     let theory , used_unsat_core : decls_t * bool = filter_theory theory in
     let input, qhash = mk_input theory in
-    let cumm_theory : decls_t =  if Options.analyze_proof () then theory else [] in
+    let cumm_theory : decls_t =  if Options.report_qi () then theory else [] in
     if not (cache_hit r cache qhash cb theory) then
         enqueue ({job=z3_job r true label_messages input cumm_theory qhash; callback=cb})
 

@@ -227,7 +227,8 @@ val ml_no_eta_expand_coertions  : unit    -> bool
 val warn_error                  : unit    -> string
 val use_extracted_interfaces    : unit    -> bool
 val use_nbe                     : unit    -> bool
-val analyze_proof               : unit    -> bool
+val report_qi                   : unit    -> bool
+val smt_proof                   : unit    -> bool
 
 // HACK ALERT! This is to ensure we have no dependency from Options to Version,
 // otherwise, since Version is regenerated all the time, this invalidates the

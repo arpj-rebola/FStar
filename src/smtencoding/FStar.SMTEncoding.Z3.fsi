@@ -45,6 +45,7 @@ type z3result = {
       z3result_time        : int;
       z3result_statistics  : z3statistics;
       z3result_query_hash  : option<string>;
+      z3result_query_decls : list<decl> 
 }
 type cb = z3result -> unit
 val giveZ3 : list<decl> -> unit
