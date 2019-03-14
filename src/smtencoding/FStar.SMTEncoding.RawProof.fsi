@@ -1,4 +1,4 @@
-module FStar.SMTEncoding.SMTProof
+module FStar.SMTEncoding.RawProof
 
 type sort =
     | Boolean

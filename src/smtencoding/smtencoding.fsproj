@@ -75,6 +75,16 @@
     <Compile Include="FStar.SMTEncoding.EncodeTerm.fs" />
     <Compile Include="FStar.SMTEncoding.Encode.fsi" />
     <Compile Include="FStar.SMTEncoding.Encode.fs" />
+    <FsYacc Include="FStar.SMTEncoding.ProofParser.fsp">
+      <OtherFlags>--module FStar.SMTEncoding.ProofParser</OtherFlags>
+    </FsYacc>
+    <FsLex Include="FStar.SMTEncoding.ProofLexer.fss">
+      <OtherFlags>--unicode</OtherFlags>
+    </FsLex>
+    <Compile Include="FStar.SMTEncoding.RawProof.fs" />
+    <Compile Include="FStar.SMTEncoding.ProofParser.fs" />
+    <Compile Include="FStar.SMTEncoding.ProofLexer.fs" />
+    <Compile Include="FStar.SMTEncoding.ProofAnalysis.fs" />
     <Compile Include="FStar.SMTEncoding.Solver.fsi" />
     <Compile Include="FStar.SMTEncoding.Solver.fs" />
     <Content Include="packages.config" />

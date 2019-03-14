@@ -23,6 +23,9 @@ open FStar.Ident
 open FStar.Universal
 module E = FStar.Errors
 
+module PA = FStar.SMTEncoding.ProofAnalysis
+module SP = FStar.SMTEncoding.SMTProof
+
 let _ = FStar.Version.dummy ()
 
 (* process_args:  parses command line arguments, setting FStar.Options *)
@@ -238,3 +241,8 @@ let main () =
   with
   | e -> handle_error e;
         exit 1
+
+// let main () =
+//     let s : string = "((proof (and $x14080 $x14080)))" in
+//     let u : SP.smt_proof_section = PA.parse_proof s in
+//     ()

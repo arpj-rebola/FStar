@@ -31,7 +31,7 @@ open FStar.SMTEncoding.ErrorReporting
 open FStar.SMTEncoding.Encode
 open FStar.SMTEncoding.Util
 open FStar.SMTEncoding.Analysis
-// open FStar.SMTEncoding.ProofAnalysis
+open FStar.SMTEncoding.ProofAnalysis
 module BU = FStar.Util
 module U = FStar.Syntax.Util
 module TcUtil = FStar.TypeChecker.Util
@@ -383,7 +383,7 @@ let process_result (settings : query_settings) (result : z3result) : option<erro
     if used_hint settings && not (Options.z3_refresh()) then Z3.refresh();
     let errs : option<errors> = query_errors settings result in
     query_info settings result;
-    // begin if Options.smt_proof () then analyze_proof result end ;
+    begin if Options.smt_proof () then analyze_proof result end ;
     record_hint settings result;
     detail_hint_replay settings result;
     errs

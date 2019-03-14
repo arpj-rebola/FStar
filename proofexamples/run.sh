@@ -29,6 +29,12 @@ run_each() {
     done
 }
 
+# get_proofs() {
+#     for SMT_FILE in *.smt2 ; do
+        
+#     done
+# }
+
 main() {
     if [[ "$1" == "clean" ]]; then
         cleanup
@@ -44,6 +50,10 @@ main() {
     elif [[ "$1" == "ulib" ]]; then
         rm -rfv ../ulib/*.hints ../ulib/*.checked ../ulib/*.queries
         OTHERFLAGS="$QUERIES_FLAG $PROFILE_FLAG" make -C ../ulib/
+        mv ../ulib/*.smt2 .
+    elif [[ "$1" == "ulib-proofs" ]]; then
+        rm -rfv ../ulib/*.hints ../ulib/*.checked ../ulib/*.queries
+        OTHERFLAGS="$QUERIES_FLAG $PROFILE_FLAG $PROOF_FLAG" make -C ../ulib/
     fi
 }
 

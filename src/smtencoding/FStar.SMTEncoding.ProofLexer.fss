@@ -23,6 +23,7 @@ let keywords =
       "*", TIMES;
       "-", MINUS;
       "forall", FORALL;
+      "exists" , EXISTS;
       "lambda", LAMBDA;
       "let", LET;
       "true", TRUE;
@@ -49,19 +50,16 @@ let keywords =
       "mp", MODUS_PONENS;
       "mp~", MODUS_PONENS_EQUIV;
       "unit-resolution", UNIT_RESOLUTION;
-      "asserted", AXIOM;
+      "asserted", PREMISE;
       "th-lemma", THEORY_LEMMA;
       "quant-inst", INSTANTIATION;
       "sk" , SKOLEMIZATION;
-      "arith", ARITHMETICS;
-      "triangle-eq" , TRIANGLE_INEQUALITY;
-      "farkas", FARKAS_LEMMA ] |> Map.ofList
-
+      "arith", ARITHMETICS ] |> Map.ofList
 }
 
 let digit = ['0'-'9']
 let int = '-'?digit+
-let char = ['a'-'z' 'A'-'Z' '@' '|' '%' '_' '.' '>' '=' '<' '!' '$' '#' '+' '-' '*' '\'' '/']
+let char = ['a'-'z' 'A'-'Z' '@' '|' '%' '_' '.' '>' '=' '<' '!' '$' '#' '+' '-' '*' '\'' '/' '~' '?']
 let weird = [':']
 let ident = char(char|digit|weird)*
 let symbol = ':'ident
@@ -76,12 +74,11 @@ rule tokenize = parse
 | int { INT(lexeme lexbuf) }
 | symbol { match keywords.TryFind(lexeme lexbuf) with   
                | Some(token) -> token   
-               | None -> ID(lexeme lexbuf)
-               }
+               | None -> ID(lexeme lexbuf) }
 | '(' { LPAREN }
 | ')' { RPAREN }
 | ident { match keywords.TryFind(lexeme lexbuf) with   
-               | Some(token) -> token   
+               | Some(token) -> token
                | None -> ID(lexeme lexbuf)
                }
 | eof { EOF }
