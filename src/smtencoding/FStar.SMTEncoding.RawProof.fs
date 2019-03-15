@@ -6,13 +6,6 @@ open FStar.All
 open FStar.Range
 open FStar.Util
 
-let hash_of_int_list (l : list<int>) : int =
-    let aux ((sum , prod , xoor) : int * int * int) (x : int) : int * int * int =
-        (sum + x , prod * x , xoor ^^^ x)
-    in
-    let (s , p , x) : int * int * int = List.fold_left aux (0 , 1 , 0) l in
-    1023 * s + p ^^^ (31 * x)
-
 type sort =
     | Boolean
     | Fuel
@@ -57,6 +50,24 @@ type operator =
     | DefinedProof of string
     | Uninterpreted of string
 
+let hash_of_operator (o : operator) : int =
+    match o with
+        | Conjunction ->  200
+        | Disjunction ->  201
+        | Negation ->  202
+        | Implication ->  203
+        | Equality ->  204
+        | Equivalence ->  205
+        | LeqInequality ->  206
+        | LtInequality ->  206
+        | GeqInequality ->  207
+        | GtInequality ->  208
+        | Addition ->  209
+        | Product ->  210
+        | Opposite ->  211
+        | DefinedTerm s -> 212
+        | Uninterpreted s -> hashcode s
+
 let string_of_operator (o : operator) : string =
     match o with
         | Conjunction -> "/\\"
@@ -72,45 +83,25 @@ let string_of_operator (o : operator) : string =
         | Addition -> "+"
         | Product -> "*"
         | Opposite -> "-"
-        | DefinedTerm s -> "$" ^ s
-        | DefinedProof s -> "#" ^ s
+        | DefinedTerm s -> s
         | Uninterpreted s -> s
-
-let hash_of_operator (dict : smap<int>) (o : operator) : int =
-    match o with
-        | Conjunction -> 200
-        | Disjunction -> 201
-        | Negation -> 202
-        | Implication -> 203
-        | Equality -> 204
-        | Equivalence -> 205
-        | LeqInequality -> 206
-        | LtInequality -> 206
-        | GeqInequality -> 207
-        | GtInequality -> 208
-        | Addition -> 209
-        | Product -> 210
-        | Opposite -> 211
-        | DefinedTerm s -> dict ("$" ^ s)
-        | DefinedProof s -> dict ("#" ^ s)
-        | Uninterpreted s -> dict s
 
 type quantifier =
     | Forall
     | Exists
     | Lambda
 
-let string_of_quantifier (q : quantifier) : string =
-    match q with
-        | Forall -> "forall"
-        | Exists -> "exists"
-        | Lambda -> "lambda"
-
 let hash_of_quantifier (q : quantifier) : int =
     match q with
         | Forall -> 301
         | Exists -> 302
         | Lambda -> 303
+
+let string_of_quantifier (q : quantifier) : string =
+    match q with
+        | Forall -> "forall"
+        | Exists -> "exists"
+        | Lambda -> "lambda"
 
 // type raw_proof =
 //     | Application of operator * list<raw_proof>
