@@ -140,7 +140,6 @@ let string_of_quantifier (q : quantifier) : string =
 
 type raw_proof =
     | RawFuel of option<raw_proof>
-    | RawSkolemVar of string
     | RawApplication of operator * list<raw_proof>
     | RawBinding of quantifier * list<(string * sort)> * raw_proof
     | RawLet of list<(string * raw_proof)> * raw_proof

@@ -49,7 +49,6 @@ val string_of_quantifier : quantifier -> string
 val hash_of_quantifier : quantifier -> int
 
 type raw_proof =
-    | RawSkolemVar of string
     | RawFuel of option<raw_proof>
     | RawApplication of operator * list<raw_proof>
     | RawBinding of quantifier * list<(string * sort)> * raw_proof
