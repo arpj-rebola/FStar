@@ -551,6 +551,16 @@ let try_find_index f l = List.tryFindIndex f l
 
 let sort_with f l = List.sortWith f l
 
+let fold_n_map (f : 'a -> 'b -> 'a * 'c) (a : 'a) (l : list<'b>) : 'a * list<'c> =
+    let rec aux (ax : 'a) (lx : list<'b>) (o : list<'c>) : 'a * list<'c> =
+      match lx with
+        | hd :: tl ->
+            let (axx , c) : 'a * 'c = f ax hd in
+            aux axx tl (c :: o)
+        | [] -> (ax , List.rev o)
+    in
+    aux a l []
+
 let bind_opt opt f =
     match opt with
     | None -> None

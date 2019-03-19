@@ -22,8 +22,6 @@ open FStar.Getopt
 open FStar.Ident
 open FStar.Universal
 module E = FStar.Errors
-
-module PA = FStar.SMTEncoding.ProofAnalysis
 module SP = FStar.SMTEncoding.SMTProof
 
 let _ = FStar.Version.dummy ()

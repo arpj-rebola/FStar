@@ -691,7 +691,7 @@ let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb
 let ask_1_core (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache:option<string>)
             (label_messages:error_labels) (qry:decls_t) (cb:cb) : unit =
     let cumm_theory : decls_t =
-        if Options.report_qi () then (cummulative_scope ())@[Push]@qry@[Pop] else []
+        if (Options.report_qi ()) || (Options.smt_proof ()) then (cummulative_scope ())@[Push]@qry@[Pop] else []
     in
     let incr_theory : decls_t = (incremental_scope ())@[Push]@qry@[Pop] in
     clear_scope () ;
@@ -708,7 +708,7 @@ let ask_n_cores (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache
     in
     let theory , used_unsat_core : decls_t * bool = filter_theory theory in
     let input, qhash = mk_input theory in
-    let cumm_theory : decls_t =  if Options.report_qi () then theory else [] in
+    let cumm_theory : decls_t =  if (Options.report_qi ()) || (Options.smt_proof ())  then theory else [] in
     if not (cache_hit r cache qhash cb theory) then
         enqueue ({job=z3_job r true label_messages input cumm_theory qhash; callback=cb})
 

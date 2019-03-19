@@ -301,6 +301,7 @@ val right: either<'a,'b> -> 'b
 val find_dup: ('a -> 'a -> bool) -> list<'a> -> option<'a>
 val nodups: ('a -> 'a -> bool) -> list<'a> -> bool
 val sort_with: ('a -> 'a -> int) -> list<'a> -> list<'a>
+val fold_n_map: ('a -> 'b -> 'a * 'c) -> 'a -> list<'b> -> 'a * list<'c>
 val remove_dups: ('a -> 'a -> bool) -> list<'a> -> list<'a>
 val add_unique: ('a -> 'a -> bool) -> 'a -> list<'a> -> list<'a>
 val try_find: ('a -> bool) -> list<'a> -> option<'a>

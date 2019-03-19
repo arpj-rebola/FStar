@@ -13,6 +13,8 @@ let keywords =
       "and", AND;
       "or", OR;
       "=>", IMPLIES;
+      "iff", IFF;
+      "ITE", ITE;
       "=", EQUAL;
       "~", EQUIV;
       "<=", LEQ;
@@ -22,6 +24,8 @@ let keywords =
       "+", PLUS;
       "*", TIMES;
       "-", MINUS;
+      "div", DIVIDED;
+      "mod", MODULUS;
       "forall", FORALL;
       "exists" , EXISTS;
       "lambda", LAMBDA;
@@ -54,7 +58,9 @@ let keywords =
       "th-lemma", THEORY_LEMMA;
       "quant-inst", INSTANTIATION;
       "sk" , SKOLEMIZATION;
-      "arith", ARITHMETICS ] |> Map.ofList
+      "arith", ARITHMETICS;
+      "ZFuel", ZERO_FUEL;
+      "SFuel", NEXT_FUEL ] |> Map.ofList
 }
 
 let digit = ['0'-'9']

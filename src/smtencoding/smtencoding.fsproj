@@ -75,16 +75,19 @@
     <Compile Include="FStar.SMTEncoding.EncodeTerm.fs" />
     <Compile Include="FStar.SMTEncoding.Encode.fsi" />
     <Compile Include="FStar.SMTEncoding.Encode.fs" />
+    <Compile Include="FStar.SMTEncoding.RawProof.fsi" />
+    <Compile Include="FStar.SMTEncoding.RawProof.fs" />
     <FsYacc Include="FStar.SMTEncoding.ProofParser.fsp">
-      <OtherFlags>--module FStar.SMTEncoding.ProofParser</OtherFlags>
+      <OtherFlags>--module FStar.SMTEncoding.ProofParser --open FStar.SMTEncoding.RawProof</OtherFlags>
     </FsYacc>
     <FsLex Include="FStar.SMTEncoding.ProofLexer.fss">
       <OtherFlags>--unicode</OtherFlags>
     </FsLex>
-    <Compile Include="FStar.SMTEncoding.RawProof.fs" />
+    <Compile Include="FStar.SMTEncoding.ProofParser.fsi" />
     <Compile Include="FStar.SMTEncoding.ProofParser.fs" />
     <Compile Include="FStar.SMTEncoding.ProofLexer.fs" />
-    <Compile Include="FStar.SMTEncoding.ProofAnalysis.fs" />
+    <Compile Include="FStar.SMTEncoding.SMTProof.fsi" />
+    <Compile Include="FStar.SMTEncoding.SMTProof.fs" />
     <Compile Include="FStar.SMTEncoding.Solver.fsi" />
     <Compile Include="FStar.SMTEncoding.Solver.fs" />
     <Content Include="packages.config" />

@@ -37,6 +37,8 @@ type operator =
     | Disjunction
     | Negation
     | Implication
+    | Biimplication
+    | Branch
     | Equality
     | Equivalence
     | LeqInequality
@@ -44,47 +46,80 @@ type operator =
     | GeqInequality
     | GtInequality
     | Addition
+    | Substraction
     | Product
     | Opposite
+    | Division
+    | Remainder
+    | Macro of string
     | DefinedTerm of string
-    | DefinedProof of string
     | Uninterpreted of string
 
-let hash_of_operator (o : operator) : int =
+let hash_of_operator (o : operator) : list<int> =
     match o with
-        | Conjunction ->  200
-        | Disjunction ->  201
-        | Negation ->  202
-        | Implication ->  203
-        | Equality ->  204
-        | Equivalence ->  205
-        | LeqInequality ->  206
-        | LtInequality ->  206
-        | GeqInequality ->  207
-        | GtInequality ->  208
-        | Addition ->  209
-        | Product ->  210
-        | Opposite ->  211
-        | DefinedTerm s -> 212
-        | Uninterpreted s -> hashcode s
+        | Conjunction -> [200]
+        | Disjunction -> [201]
+        | Negation -> [202]
+        | Implication -> [203]
+        | Biimplication -> [204]
+        | Branch -> [205]
+        | Equality -> [206]
+        | Equivalence -> [207]
+        | LeqInequality -> [208]
+        | LtInequality -> [209]
+        | GeqInequality -> [210]
+        | GtInequality -> [211]
+        | Addition ->  [212]
+        | Substraction -> [213]
+        | Product -> [214]
+        | Opposite -> [215]
+        | Division -> [216]
+        | Remainder -> [217]
+        | Uninterpreted s -> [218 ; hashcode s]
+        | Macro s
+        | DefinedTerm s -> failwith "Cannot compute a parametric hash of an operator"
 
 let string_of_operator (o : operator) : string =
     match o with
         | Conjunction -> "/\\"
         | Disjunction -> "\\/"
-        | Negation -> "~"
+        | Negation -> "!"
         | Implication -> "=>"
+        | Biimplication -> "<==>"
+        | Branch -> "ITE"
         | Equality -> "="
-        | Equivalence -> "~~~"
+        | Equivalence -> "~"
         | LeqInequality -> "<="
         | LtInequality -> "<"
         | GeqInequality -> ">="
         | GtInequality -> ">="
         | Addition -> "+"
+        | Substraction -> "-"
         | Product -> "*"
         | Opposite -> "-"
-        | DefinedTerm s -> s
+        | Division -> "/"
+        | Remainder -> "%"
+        | Macro s -> "#" ^ s
+        | DefinedTerm s -> "$" ^ s
         | Uninterpreted s -> s
+
+let infix_operator (o : operator) : bool =
+    match o with
+        | Conjunction
+        | Disjunction
+        | Implication
+        | Biimplication
+        | Equality
+        | Equivalence
+        | LeqInequality
+        | LtInequality
+        | GeqInequality
+        | GtInequality
+        | Addition
+        | Substraction
+        | Product -> true
+        | Branch -> failwith "Branching operators are ternary"
+        | _ -> false
 
 type quantifier =
     | Forall
@@ -103,90 +138,79 @@ let string_of_quantifier (q : quantifier) : string =
         | Exists -> "exists"
         | Lambda -> "lambda"
 
-// type raw_proof =
-//     | Application of operator * list<raw_proof>
-//     | Binding of quantifier * list<(string * sort)> * raw_proof
-//     | Let of list<(string * raw_proof)> * raw_proof
-//     | IntegerConst of string
-//     | BooleanConst of bool
-//     | Arbitrary of raw_proof * raw_proof
-//     | Congruence of list<raw_proof> * raw_proof
-//     | Reflexivity of raw_proof
-//     | Symmetry of raw_proof * raw_proof
-//     | Transitivity of raw_proof * raw_proof * raw_proof
-//     | Reachability of list<raw_proof> * raw_proof
-//     | Generalization of raw_proof
-//     | Instantiation of list<raw_proof> * raw_proof
-//     | Rewrite of raw_proof
-//     | ModusPonens of raw_proof * raw_proof * raw_proof
-//     | ModusPonensEquiv of raw_proof * raw_proof * raw_proof
-//     | Skolemization of raw_proof
-//     | PosNnf of list<raw_proof>
-//     | NegNnf of list<raw_proof>
-//     | UnitResolution of list<raw_proof> * raw_proof
-//     | Asserted of raw_proof
-//     | TriangleInequality of raw_proof
-//     | FarkasLemma of list<raw_proof> * list<raw_proof>
-//     | AssignBounds of list<raw_proof> * raw_proof
-//     | Arithmetics of raw_proof
-//     | ProofEnd
-
-type inference =
-    | RawSkolemization
-    | RawNnf
-    | RawArbitrary
-    | RawGeneralization
-    | RawPremise
-    | RawResolution
-    | RawCongruence
-    | RawInstantiation of list<raw_proof>
-    | RawRewrite
-    | RawArithmetics of string * list<raw_proof>
-
-and raw_proof =
+type raw_proof =
+    | RawFuel of option<raw_proof>
+    | RawSkolemVar of string
     | RawApplication of operator * list<raw_proof>
     | RawBinding of quantifier * list<(string * sort)> * raw_proof
     | RawLet of list<(string * raw_proof)> * raw_proof
     | RawInteger of string
     | RawBoolean of bool
-    | RawInference of inference * list<raw_proof>
+    | RawPremise of raw_proof
+    | RawSkolemization of raw_proof
+    | RawRewriting of raw_proof
+    | RawNnf of list<raw_proof> * raw_proof
+    | RawResolution of list<raw_proof> * raw_proof
+    | RawCongruence of list<raw_proof> * raw_proof
+    | RawGeneralization of raw_proof * raw_proof
+    | RawInstantiation of list<raw_proof> * raw_proof
+    | RawArithmetics of list<raw_proof> * list<raw_proof>
 
-let string_of_inference (level : int) (dict : smap<int>) (i : inference) : string =
-    match i with
-        | RawSkolemization -> "Skolem"
-        | RawNnf -> "Nnf"
-        | RawArbitrary -> "Arbitrary"
-        | RawGeneralization -> "Generalize"
-        | RawPremise -> "Premise"
-        | RawResolution -> "Resolution"
-        | RawCongruence -> "Congruence"
-        | RawInstantiation p -> "[Instantiate " ^ (String.concat " " (List.map (string_of_raw_proof level dict) p)) ^ "]"
-        | RawRewrite -> "Rewrite"
-        | RawArithmetics (s , p) -> "[Arithmetics:" ^ s ^ " " ^ (String.concat " " (List.map (string_of_raw_proof level dict) p)) ^ "]"
-
-and string_of_raw_proof (level : int) (dict : smap<int>) (p : raw_proof): string =
+let rec string_of_raw_proof (level : int) (p : raw_proof) : string =
     match p with
-        | RawApplication (o , args) -> "(" ^ (string_of_operator dict o) ^ " " ^ (String.concat " " (List.map (string_of_raw_proof level dict) args)) ^ ")"
+        | RawFuel (None) -> "ZFuel"
+        | RawFuel (Some p) -> "(SFuel " ^ (string_of_raw_proof level p) ^ ")"
+        | RawApplication (o , args) -> "(" ^ (string_of_operator o) ^ " " ^ (String.concat " " (List.map (string_of_raw_proof level) args)) ^ ")"
         | RawBinding (q , bs , scp) ->
             let bs_s : list<string> = List.map (fun ((var , st) : string * sort) -> "(" ^ var ^ " " ^ (string_of_sort st)) bs in
-            "{" ^ (string_of_quantifier q) ^ " " ^ (String.concat " " bs_s) ^ " : " ^ (string_of_raw_proof level dict scp) ^ "}"
+            "{" ^ (string_of_quantifier q) ^ " " ^ (String.concat " " bs_s) ^ " : " ^ (string_of_raw_proof level scp) ^ "}"
         | RawLet (bs , scp) ->
-            let bs_s : list<string> = List.map (fun ((var , p) : string * raw_proof) -> (repeat (level + 1) "\t") ^ var ^ " := " ^ (string_of_raw_proof (level + 1) dict))
-            "{\n" ^ (String.concat "\n" bs_s) ^ "\n" ^ (repeat level "\t") ^ ": " ^ (string_of_raw_proof level dict scp) ^ "}"
+            let bs_s : list<string> = List.map (fun ((var , p) : string * raw_proof) -> (repeat (level + 1) "\t") ^ var ^ " := " ^ (string_of_raw_proof (level + 1) p)) bs in
+            "{\n" ^ (String.concat "\n" bs_s) ^ "\n" ^ (repeat level "\t") ^ ": " ^ (string_of_raw_proof level scp) ^ "}"
         | RawInteger s -> s
         | RawBoolean true -> "True"
         | RawBoolean false -> "False"
-        | RawInference (i , p) -> "(" ^ (string_of_inference level dict i) ^ (List.concat " " (List.map (string_of_raw_proof level dict) p)) ^ ")"
+        | RawPremise px -> "(premise " ^ (string_of_raw_proof level px) ^ ")"
+        | RawSkolemization px -> "(skolem " ^ (string_of_raw_proof level px) ^ ")"
+        | RawRewriting px -> "(rewrite " ^ (string_of_raw_proof level px) ^ ")"
+        | RawNnf (px , r) -> "(nnf (" ^ (String.concat " " (List.map (string_of_raw_proof level) px)) ^ ") " ^ string_of_raw_proof level r ^ ")"
+        | RawResolution (px , r) -> "(resolution (" ^ (String.concat " " (List.map (string_of_raw_proof level) px)) ^ ") " ^ string_of_raw_proof level r ^ ")"
+        | RawCongruence (px , r) -> "(congruence (" ^ (String.concat " " (List.map (string_of_raw_proof level) px)) ^ ") " ^ string_of_raw_proof level r ^ ")"
+        | RawGeneralization (px , r) -> "(generalization " ^ (string_of_raw_proof level px) ^ " " ^ (string_of_raw_proof level r) ^ ")"
+        | RawInstantiation (px , r) -> "(instantiation (" ^ (String.concat " " (List.map (string_of_raw_proof level) px)) ^ ") " ^ string_of_raw_proof level r ^ ")"
+        | RawArithmetics (px , rx) -> "(arithmetics (" ^ (String.concat " " (List.map (string_of_raw_proof level) px)) ^ ") " ^ (String.concat " " (List.map (string_of_raw_proof level) rx)) ^ ")"
 
 type raw_function = string * list<sort> * sort
 type raw_proof_section = list<raw_function> * raw_proof
 
+let string_of_raw_proof_section ((funs , pf) : raw_proof_section) : string =
+    let printfun ((nm , sg , st) : raw_function) : string =
+        let sep : string = if List.isEmpty sg then "" else " " in
+        nm ^ " : " ^ (String.concat " * " (List.map string_of_sort sg)) ^ sep ^ (string_of_sort st)
+    in
+    let strings : list<string> = (List.map printfun funs) @ [string_of_raw_proof 0 pf] in
+    String.concat "\n" strings
 
-
-
-
-
-
-
-
-
+let unroll_lets (p : raw_proof) : raw_proof =
+    let rec aux (rnm : list<(string * raw_proof)>) (pf : raw_proof) : raw_proof =
+        match pf with
+            | RawApplication (Uninterpreted s , []) -> begin
+                match find_opt (fun ((ss , _) : string * raw_proof) -> s = ss) rnm with
+                    | Some (ss , lt) -> lt
+                    | None -> pf
+            end
+            | RawApplication (o , args) -> RawApplication (o , List.map (aux rnm) args)
+            | RawBinding (q , bs , scp) -> RawBinding (q , bs , aux rnm scp)
+            | RawLet (bs , scp) -> aux (rnm @ (List.map (fun ((s , t) : string * raw_proof) -> (s , aux rnm t)) bs)) scp
+            | RawPremise px -> RawPremise (aux rnm px)
+            | RawSkolemization px -> RawSkolemization (aux rnm px)
+            | RawRewriting px -> RawRewriting (aux rnm px)
+            | RawNnf (px , r) -> RawNnf (List.map (aux rnm) px , aux rnm r)
+            | RawResolution (px , r) -> RawResolution (List.map (aux rnm) px , aux rnm r)
+            | RawCongruence (px , r) -> RawCongruence (List.map (aux rnm) px , aux rnm r)
+            | RawGeneralization (px , r) -> RawGeneralization (aux rnm px , aux rnm r)
+            | RawInstantiation (px , r) -> RawInstantiation (List.map (aux rnm) px , aux rnm r)
+            | RawArithmetics (px , rx) -> RawArithmetics (List.map (aux rnm) px , List.map (aux rnm) rx)
+            | _ -> pf
+    in
+    aux [] p

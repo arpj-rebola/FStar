@@ -974,8 +974,8 @@ let preludeDecls : list<decl> =
             validity_pat) prrng)
     in
     let operator_pat (nm : string) : term = mkApp (nm , [mkFreeV intvarx prrng ; mkFreeV intvary prrng]) prrng in
-    let operator (nm : string) (sm : string) : term = mkForall prrng ([[operator_pat nm]] , [intvarx ; intvary] , mkEq (operator_pat nm ,
-        mkApp (sm , [mkFreeV intvarx prrng ; mkFreeV intvary prrng]) prrng
+    let operator (nm : string) (o : op) : term = mkForall prrng ([[operator_pat nm]] , [intvarx ; intvary] , mkEq (operator_pat nm ,
+        mkApp' (o , [mkFreeV intvarx prrng ; mkFreeV intvary prrng]) prrng
     ) prrng ) in
     let constrs : list<decl> = [
         ("FString_const", ["FString_const_proj_0", Int_sort, true], String_sort, 0, true);
@@ -1058,9 +1058,9 @@ let preludeDecls : list<decl> =
         DeclFun ("_div" , [Int_sort ; Int_sort] , Int_sort , None) ;
         DeclFun ("_mod" , [Int_sort ; Int_sort] , Int_sort , None) ;
         DeclFun ("__uu__PartialApp" , [] , Term_sort , None) ;
-        Assume ({assumption_name=escape "arithmetic_multiplication" ; assumption_caption=Some "Arithmetic multiplication" ; assumption_term=operator "_mul" "*" ; assumption_fact_ids=[]}) ;
-        Assume ({assumption_name=escape "arithmetic_division" ; assumption_caption=Some "Arithmetic division" ; assumption_term=operator "_div" "div" ; assumption_fact_ids=[]}) ;
-        Assume ({assumption_name=escape "arithmetic_modulus" ; assumption_caption=Some "Arithmetic modulus" ; assumption_term=operator "_mod" "mod" ; assumption_fact_ids=[]}) ;
+        Assume ({assumption_name=escape "arithmetic_multiplication" ; assumption_caption=Some "Arithmetic multiplication" ; assumption_term=operator "_mul" Mul ; assumption_fact_ids=[]}) ;
+        Assume ({assumption_name=escape "arithmetic_division" ; assumption_caption=Some "Arithmetic division" ; assumption_term=operator "_div" Div ; assumption_fact_ids=[]}) ;
+        Assume ({assumption_name=escape "arithmetic_modulus" ; assumption_caption=Some "Arithmetic modulus" ; assumption_term=operator "_mod" Mod ; assumption_fact_ids=[]}) ;
     ] @ constrs @ [
         DefineFun ("is-Prims.LexCons" , [Term_sort] , Bool_sort , isprims , None ) ;
         DeclFun ("Prims.lex_t" , [] , Term_sort , None) ;

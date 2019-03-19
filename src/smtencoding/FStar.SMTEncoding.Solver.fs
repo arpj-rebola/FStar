@@ -31,7 +31,7 @@ open FStar.SMTEncoding.ErrorReporting
 open FStar.SMTEncoding.Encode
 open FStar.SMTEncoding.Util
 open FStar.SMTEncoding.Analysis
-open FStar.SMTEncoding.ProofAnalysis
+open FStar.SMTEncoding.SMTProof
 module BU = FStar.Util
 module U = FStar.Syntax.Util
 module TcUtil = FStar.TypeChecker.Util

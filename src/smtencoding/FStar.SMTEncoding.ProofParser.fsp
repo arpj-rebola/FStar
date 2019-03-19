@@ -11,14 +11,15 @@ open FStar.Util
 %token TRUE FALSE
 %token ANNOTATION PATTERN QID
 %token PARAMETRIC
-%token NOT AND OR IMPLIES
+%token NOT AND OR IMPLIES IFF ITE
 %token EQUAL EQUIV
-%token LEQ LT GEQ GT PLUS TIMES MINUS
+%token LEQ LT GEQ GT PLUS TIMES MINUS DIVIDED MODULUS
 %token FORALL EXISTS LAMBDA
 %token LET
 %token TERM BOOLEAN STRING INTEGER FUEL
 %token ARBITRARY CONGRUENCE REFLEXIVITY SYMMETRY TRANSITIVITY REACHABILITY GENERALIZATION POSITIVE_NNF NEGATIVE_NNF REWRITING MODUS_PONENS MODUS_PONENS_EQUIV UNIT_RESOLUTION INSTANTIATION SKOLEMIZATION
 %token PREMISE THEORY_LEMMA ARITHMETICS
+%token ZERO_FUEL NEXT_FUEL
 %token EOF
 
 %start start
@@ -45,6 +46,10 @@ proofs:
 proof:
     | ID
         { RawApplication (Uninterpreted $1 , []) }
+    | ZERO_FUEL
+        { RawFuel None }
+    | LPAREN NEXT_FUEL proof RPAREN
+        { RawFuel (Some $3)}
     | LPAREN operator proofs RPAREN
         { RawApplication ($2 , List.rev $3) }
     | LPAREN quantifier LPAREN bindings RPAREN proof RPAREN
@@ -60,39 +65,41 @@ proof:
     | LPAREN ANNOTATION proof annotations RPAREN
         { $3 }
     | LPAREN PREMISE proof RPAREN
-        { RawInference (RawPremise , [proof]) }
+        { RawPremise ($3) }
     | LPAREN UNIT_RESOLUTION proofs proof RPAREN
-        { RawInference (RawResolution , $4 :: (List.rev $3)) }
+        { RawResolution (List.rev $3 , $4) }
     | LPAREN MODUS_PONENS proof proof proof RPAREN
-        { RawInference (RawResolution , [$5 ; $3 ; $4] }
+        { RawResolution ([$3 ; $4] , $5) }
     | LPAREN MODUS_PONENS_EQUIV proof proof proof RPAREN
-        { RawInference (RawResolution , [$5 ; $3 ; $4] }
+        { RawResolution ([$3 ; $4] , $5) }
     | LPAREN CONGRUENCE proofs proof RPAREN
-        { RawInference (RawCongruence , $4 :: (List.rev $3)) }
+        { RawCongruence (List.rev $3 , $4) }
     | LPAREN REFLEXIVITY proof RPAREN
-        { RawInference (RawCongruence , [$3]) }
+        { RawCongruence ([] , $3) }
     | LPAREN SYMMETRY proof proof RPAREN
-        { RawInference (RawCongruence , [$4 ; $3]) }
+        { RawCongruence ([$3] , $4) }
     | LPAREN TRANSITIVITY proof proof proof RPAREN
-        { RawInference (RawCongruence , [$5 ; $3 ; $4]) }
+        { RawCongruence ([$3 ; $4] , $5) }
     | LPAREN REACHABILITY proofs proof RPAREN
-        { RawInference (RawCongruence , $4 :: (List.rev $3)) }
+        { RawCongruence (List.rev $3 , $4) }
     | LPAREN REWRITING proof RPAREN
-        { RawInference (RawRewrite , [$3]) }
+        { RawRewriting $3 }
+    | LPAREN GENERALIZATION proof proof RPAREN
+        { RawGeneralization ($3 , $4) }
     | LPAREN ARBITRARY proof proof RPAREN
-        { RawInference (RawArbitrary , [$4 ; $3]) }
+        { RawGeneralization ($3 , $4) }
     | LPAREN LPAREN PARAMETRIC INSTANTIATION proofs RPAREN proof RPAREN
-        { RawInference (RawInstantiation (List.rev $5) , [$7]) }
+        { RawInstantiation (List.rev $5 , $7) }
     | LPAREN SKOLEMIZATION proof RPAREN
-        { RawInference (RawSkolemization , [$3]) }
-    | LPAREN POSITIVE_NNF proofs RPAREN
-        { RawInference (RawNnf , [List.rev $3]) }
-    | LPAREN NEGATIVE_NNF proofs RPAREN
-        { RawInference (RawNnf , [List.rev $3]) }
+        { RawSkolemization $3 }
+    | LPAREN POSITIVE_NNF proofs proof RPAREN
+        { RawNnf (List.rev $3 , $4) }
+    | LPAREN NEGATIVE_NNF proofs proof RPAREN
+        { RawNnf (List.rev $3 , $4) }
     | LPAREN LPAREN PARAMETRIC THEORY_LEMMA ARITHMETICS ID proofs RPAREN proofs RPAREN
-        { RawInference (RawArithmetics ($6 , List.rev $7) , List.rev $9) }
+        { RawArithmetics (List.rev $7 , List.rev $9)}
     | LPAREN LPAREN PARAMETRIC THEORY_LEMMA ARITHMETICS RPAREN proofs RPAREN
-        { RawInference (RawArithmetics ("" , List.rev $6) , List.rev $8) }
+        { RawArithmetics ([], List.rev $7)}
 
 definitions:
     |
@@ -141,6 +148,10 @@ operator:
       { Negation }
   | IMPLIES
       { Implication }
+  | IFF
+      { Biimplication }
+  | ITE
+      { Branch }
   | EQUAL
       { Equality }
   | EQUIV
@@ -159,6 +170,10 @@ operator:
       { Product }
   | MINUS
       { Opposite }
+  | DIVIDED
+      { Division }
+  | MODULUS
+      { Remainder }
   | ID
       { Uninterpreted $1 }
 
