@@ -39,10 +39,10 @@ let withenv c (a, b) = (a,b,c)
 let vargs args = List.filter (function (BU.Inl _, _) -> false | _ -> true) args
 (* ------------------------------------ *)
 (* Some operations on constants *)
-let escape (s:string) : string = BU.replace_char s '\'' '_'
-let mk_term_projector_name (lid : lident) (a:bv) : string =
+let escape (s:string) = BU.replace_char s '\'' '_'
+let mk_term_projector_name lid (a:bv) =
     escape <| BU.format2 "%s_%s" lid.str a.ppname.idText
-let primitive_projector_by_pos (env : env) (lid : lident) (i : int) : string  =
+let primitive_projector_by_pos env lid i =
     let fail () = failwith (BU.format2 "Projector %s on data constructor %s not found" (string_of_int i) (lid.str)) in
     let _, t = Env.lookup_datacon env lid in
     match (SS.compress t).n with
@@ -53,12 +53,12 @@ let primitive_projector_by_pos (env : env) (lid : lident) (i : int) : string  =
           else let b = List.nth binders i in
                 mk_term_projector_name lid (fst b)
         | _ -> fail ()
-let mk_term_projector_name_by_pos (lid : lident) (i : int) : string = escape <| BU.format2 "%s_%s" lid.str (string_of_int i)
+let mk_term_projector_name_by_pos lid (i:int) = escape <| BU.format2 "%s_%s" lid.str (string_of_int i)
 let mk_term_projector (lid:lident) (a:bv) : term =
     mkFreeV(mk_term_projector_name lid a, Arrow(Term_sort, Term_sort))
-let mk_term_projector_by_pos (lid : lident) (i : int) : term =
+let mk_term_projector_by_pos (lid:lident) (i:int) : term =
     mkFreeV(mk_term_projector_name_by_pos lid i, Arrow(Term_sort, Term_sort))
-let mk_data_tester env (l : lident) (x : term) : term = mk_tester (escape l.str) x
+let mk_data_tester env l x = mk_tester (escape l.str) x
 (* ------------------------------------ *)
 (* New name generation *)
 type varops_t = {
@@ -73,36 +73,34 @@ type varops_t = {
     next_id: unit -> int;
     mk_unique:string -> string;
 }
-let varops : varops_t =
-    let initial_ctr : int = 100 in
-    let ctr : ref<int> = BU.mk_ref initial_ctr in
-    let new_scope () : (BU.smap<bool> * BU.smap<term>) = (BU.smap_create 100, BU.smap_create 100) in (* a scope records all the names and string constants used in that scope *)
-    let scopes : ref<(list<(BU.smap<bool> * BU.smap<term>)>)> = BU.mk_ref [new_scope ()] in
-    let mk_unique (y : string) : string =
-        let y : string = escape y in
-        let y : string = match BU.find_map (!scopes) (fun (names, _) -> BU.smap_try_find names y) with
+let varops =
+    let initial_ctr = 100 in
+    let ctr = BU.mk_ref initial_ctr in
+    let new_scope () = (BU.smap_create 100, BU.smap_create 100) in (* a scope records all the names and string constants used in that scope *)
+    let scopes = BU.mk_ref [new_scope ()] in
+    let mk_unique y =
+        let y = escape y in
+        let y = match BU.find_map (!scopes) (fun (names, _) -> BU.smap_try_find names y) with
                   | None -> y
                   | Some _ -> BU.incr ctr; y ^ "__" ^ (string_of_int !ctr) in
-        let top_scope : BU.smap<bool> = fst <| List.hd !scopes in
-        BU.smap_add top_scope y true;
-        y
-    in
-    let new_var (pp : ident) (rn : int) : string = mk_unique <| pp.idText ^ "__" ^ (string_of_int rn) in
-    let new_fvar (lid : lident) : string = mk_unique lid.str in
-    let next_id () : int = BU.incr ctr; !ctr in
-    let fresh (pfx : string) : string = BU.format2 "%s_%s" pfx (string_of_int <| next_id()) in
-    let string_const (s : string) : term = match BU.find_map !scopes (fun (_, strings) -> BU.smap_try_find strings s) with
+        let top_scope = fst <| List.hd !scopes in
+        BU.smap_add top_scope y true; y in
+    let new_var pp rn = mk_unique <| pp.idText ^ "__" ^ (string_of_int rn) in
+    let new_fvar lid = mk_unique lid.str in
+    let next_id () = BU.incr ctr; !ctr in
+    let fresh pfx = BU.format2 "%s_%s" pfx (string_of_int <| next_id()) in
+    let string_const s = match BU.find_map !scopes (fun (_, strings) -> BU.smap_try_find strings s) with
         | Some f -> f
         | None ->
-            let id : int = next_id () in
-            let f : term = Term.boxString <| mk_String_const id in
-            let top_scope : BU.smap<term> = snd <| List.hd !scopes in
+            let id = next_id () in
+            let f = Term.boxString <| mk_String_const id in
+            let top_scope = snd <| List.hd !scopes in
             BU.smap_add top_scope s f;
             f in
-    let push () : unit = scopes := new_scope() :: !scopes in // already signal-atomic
-    let pop () : unit = scopes := List.tl !scopes in // already signal-atomic
-    let snapshot () : (int * unit) = FStar.Common.snapshot push scopes () in
-    let rollback (depth : option<int>) : unit = FStar.Common.rollback pop scopes depth in
+    let push () = scopes := new_scope() :: !scopes in // already signal-atomic
+    let pop () = scopes := List.tl !scopes in // already signal-atomic
+    let snapshot () = FStar.Common.snapshot push scopes () in
+    let rollback depth = FStar.Common.rollback pop scopes depth in
     {push=push;
      pop=pop;
      snapshot=snapshot;
