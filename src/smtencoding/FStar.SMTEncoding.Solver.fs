@@ -97,7 +97,7 @@ let finalize_hints_db (src_filename : string) : unit =
     replaying_hints := None
 
 let with_hints_db (fname : string) (f : unit -> 'a) : 'a =
-    initialize_hints_db fname;
+    initialize_hints_db fname false ;
     let result = f () in
     // for the moment, there should be no need to trap exceptions to finalize the hints db
     // no cleanup needs to occur if an error occurs.
@@ -380,7 +380,6 @@ let process_result (settings : query_settings) (result : z3result) : option<erro
     if used_hint settings && not (Options.z3_refresh()) then Z3.refresh();
     let errs : option<errors> = query_errors settings result in
     query_info settings result;
-    begin if Options.smt_proof () then analyze_proof result end ;
     record_hint settings result;
     detail_hint_replay settings result;
     errs

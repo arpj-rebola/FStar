@@ -135,7 +135,7 @@ let status_tag : z3status -> string = function
 
 let status_string_and_errors (s : z3status) : string * list<error_label> = match s with
     | KILLED
-    | UNSAT _ -> status_tag s
+    | UNSAT _ -> (status_tag s , [])
     | SAT (errs, msg)
     | UNKNOWN (errs, msg)
     | TIMEOUT (errs, msg) -> BU.format2 "%s%s" (status_tag s) (match msg with None -> "" | Some msg -> " because " ^ msg), errs
@@ -304,7 +304,6 @@ type smt_output = {
   smt_unsat_core:     option<smt_output_section>;
   smt_statistics:     option<smt_output_section>;
   smt_labels:         option<smt_output_section>;
-  smt_refutation:     option<smt_output_section>;
 }
 
 let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
@@ -477,12 +476,11 @@ let z3_job (r : query_info) (fresh : bool) (label_messages:error_labels) (input 
       raise e
   in
   let _, elapsed_time : float * int = BU.time_diff start (BU.now()) in
-  let ds : list<decl> = if Options.smt_proof () then decls else [] in
   { z3result_status     = status;
     z3result_time       = elapsed_time;
     z3result_statistics = statistics;
     z3result_query_hash = qhash ;
-    z3result_query_decls = ds ; }
+    z3result_query_decls = decls ; }
 
 let running : ref<bool> = BU.mk_ref false
 
@@ -663,7 +661,7 @@ let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb
             let stats : BU.smap<string> = BU.smap_create 0 in
             smap_add stats "fstar_cache_hit" "1";
             let result = {
-              z3result_status = UNSAT (None , None);
+              z3result_status = UNSAT None ;
               z3result_time = 0;
               z3result_statistics = stats ;
               z3result_query_hash = qhash ;
@@ -679,7 +677,7 @@ let cache_hit (r : query_info) (cache:option<string>) (qhash:option<string>) (cb
 let ask_1_core (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache:option<string>)
             (label_messages:error_labels) (qry:decls_t) (cb:cb) : unit =
     let cumm_theory : decls_t =
-        if (Options.report_qi ()) || (Options.smt_proof ()) then (cummulative_scope ())@[Push]@qry@[Pop] else []
+        if (Options.report_qi ()) then (cummulative_scope ())@[Push]@qry@[Pop] else []
     in
     let incr_theory : decls_t = (incremental_scope ())@[Push]@qry@[Pop] in
     clear_scope () ;
@@ -696,7 +694,7 @@ let ask_n_cores (r: query_info) (filter_theory:decls_t -> decls_t * bool) (cache
     in
     let theory , used_unsat_core : decls_t * bool = filter_theory theory in
     let input, qhash = mk_input theory in
-    let cumm_theory : decls_t =  if (Options.report_qi ()) || (Options.smt_proof ())  then theory else [] in
+    let cumm_theory : decls_t =  if Options.report_qi ()  then theory else [] in
     if not (cache_hit r cache qhash cb theory) then
         enqueue ({job=z3_job r true label_messages input cumm_theory qhash; callback=cb})
 
