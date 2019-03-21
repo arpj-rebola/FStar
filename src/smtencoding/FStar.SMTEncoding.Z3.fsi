@@ -20,7 +20,7 @@ open FStar.ST
 open FStar.All
 open FStar
 open FStar.SMTEncoding.Term
-open FStar.SMTEncoding.Analysis
+open FStar.SMTEncoding.QIReport
 open FStar.BaseTypes
 open FStar.Util
 module BU = FStar.Util

@@ -64,8 +64,8 @@
     <Compile Include="FStar.SMTEncoding.Term.fsi" />
     <Compile Include="FStar.SMTEncoding.Term.fs" />
     <Compile Include="FStar.SMTEncoding.Util.fs" />
-    <Compile Include="FStar.SMTEncoding.Analysis.fsi" />
-    <Compile Include="FStar.SMTEncoding.Analysis.fs" />
+    <Compile Include="FStar.SMTEncoding.QIReport.fsi" />
+    <Compile Include="FStar.SMTEncoding.QIReport.fs" />
     <Compile Include="FStar.SMTEncoding.Z3.fsi" />
     <Compile Include="FStar.SMTEncoding.Z3.fs" />
     <Compile Include="FStar.SMTEncoding.ErrorReporting.fsi" />
@@ -75,19 +75,6 @@
     <Compile Include="FStar.SMTEncoding.EncodeTerm.fs" />
     <Compile Include="FStar.SMTEncoding.Encode.fsi" />
     <Compile Include="FStar.SMTEncoding.Encode.fs" />
-    <Compile Include="FStar.SMTEncoding.RawProof.fsi" />
-    <Compile Include="FStar.SMTEncoding.RawProof.fs" />
-    <FsYacc Include="FStar.SMTEncoding.ProofParser.fsp">
-      <OtherFlags>--module FStar.SMTEncoding.ProofParser --open FStar.SMTEncoding.RawProof</OtherFlags>
-    </FsYacc>
-    <FsLex Include="FStar.SMTEncoding.ProofLexer.fss">
-      <OtherFlags>--unicode</OtherFlags>
-    </FsLex>
-    <Compile Include="FStar.SMTEncoding.ProofParser.fsi" />
-    <Compile Include="FStar.SMTEncoding.ProofParser.fs" />
-    <Compile Include="FStar.SMTEncoding.ProofLexer.fs" />
-    <Compile Include="FStar.SMTEncoding.SMTProof.fsi" />
-    <Compile Include="FStar.SMTEncoding.SMTProof.fs" />
     <Compile Include="FStar.SMTEncoding.Solver.fsi" />
     <Compile Include="FStar.SMTEncoding.Solver.fs" />
     <Content Include="packages.config" />

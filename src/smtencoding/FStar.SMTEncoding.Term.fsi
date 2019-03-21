@@ -109,7 +109,6 @@ type assumption = {
 type decl =
   | FuelDeclaration
   | SortDeclaration of string
-  | DefPrelude
   | GenerateOptions
   | Hardcoded  of string
   | DeclFun    of string * list<sort> * sort * caption

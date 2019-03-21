@@ -19,7 +19,6 @@ module FStar.SMTEncoding.Solver
 open FStar.ST
 open FStar.All
 open FStar
-open FStar.Ident
 open FStar.SMTEncoding.Z3
 open FStar.SMTEncoding.Term
 open FStar.BaseTypes
@@ -30,8 +29,7 @@ open FStar.SMTEncoding
 open FStar.SMTEncoding.ErrorReporting
 open FStar.SMTEncoding.Encode
 open FStar.SMTEncoding.Util
-open FStar.SMTEncoding.Analysis
-open FStar.SMTEncoding.SMTProof
+open FStar.SMTEncoding.QIReport
 module BU = FStar.Util
 module U = FStar.Syntax.Util
 module TcUtil = FStar.TypeChecker.Util
@@ -46,20 +44,20 @@ module Env = FStar.TypeChecker.Env
 // both the F# and OCaml implementations.
 
 type z3_replay_result = either<Z3.unsat_core, error_labels>
-// let z3_result_as_replay_result = function
-//     | Inl l -> Inl l
-//     | Inr (r, _) -> Inr r
+let z3_result_as_replay_result = function
+    | Inl l -> Inl l
+    | Inr (r, _) -> Inr r
 let recorded_hints : ref<(option<hints>)> = BU.mk_ref None
 let replaying_hints: ref<(option<hints>)> = BU.mk_ref None
-let format_hints_file_name (src_filename : string) : string = BU.format1 "%s.hints" src_filename
+let format_hints_file_name src_filename = BU.format1 "%s.hints" src_filename
 
 (****************************************************************************)
 (* Hint databases (public)                                                  *)
 (****************************************************************************)
-let initialize_hints_db (src_filename : string) : unit =
+let initialize_hints_db src_filename format_filename : unit =
     if Options.record_hints() then recorded_hints := Some [];
     if Options.use_hints()
-    then let norm_src_filename : string = BU.normalize_file_path src_filename in
+    then let norm_src_filename = BU.normalize_file_path src_filename in
          let val_filename = match Options.hint_file() with
                             | Some fn -> fn
                             | None -> (format_hints_file_name norm_src_filename) in
@@ -222,8 +220,7 @@ let with_fuel_and_diagnostics (settings : query_settings) (label_assumptions : d
         Term.CheckSat; //go Z3!
         Term.GetReasonUnknown //explain why it failed
     ]
-    @(if Options.record_hints() || Options.smt_proof() then [Term.GetUnsatCore]  else []) //unsat core is the recorded hint
-    @(if Options.smt_proof() then [Term.GetProof]  else [])
+    @(if Options.record_hints() then [Term.GetUnsatCore]  else []) //unsat core is the recorded hint
     @(if Options.print_z3_statistics() then [Term.GetStatistics] else []) //stats
     @settings.query_suffix //recover error labels and a final "Done!" message
 
@@ -358,7 +355,7 @@ let record_hint (settings : query_settings) (z3result : z3result) : unit =
                   unsat_core=core;
                   query_elapsed_time=0; //recording the elapsed_time prevents us from reaching a fixed point
                   hash=(match z3result.z3result_status with
-                        | UNSAT (core , proof) -> z3result.z3result_query_hash
+                        | UNSAT _ -> z3result.z3result_query_hash
                         | _ -> None)
           }
       in
@@ -368,10 +365,10 @@ let record_hint (settings : query_settings) (z3result : z3result) : unit =
           | _ -> assert false; ()
       in
       match z3result.z3result_status with
-      | UNSAT (None , _) ->
+      | UNSAT None ->
         // we succeeded by just matching a query hash
         store_hint (Option.get (get_hint_for settings.query_name settings.query_index))
-      | UNSAT (unsat_core , _)->
+      | UNSAT unsat_core ->
         if used_hint settings //if we already successfully use a hint
         then //just re-use the successful hint, but record the hash of the pruned theory
              store_hint (mk_hint settings.query_hint)

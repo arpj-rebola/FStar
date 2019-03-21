@@ -21,7 +21,7 @@ open FStar.Exn
 open FStar.All
 open FStar
 open FStar.SMTEncoding.Term
-open FStar.SMTEncoding.Analysis
+open FStar.SMTEncoding.QIReport
 open FStar.BaseTypes
 open FStar.Util
 // module Proof = FStar.SMTEncoding.SMTSexpr
