@@ -320,7 +320,6 @@ let term_term_to_smt_term (dv : smt_derivation) (id : string) (tm : ST.term) : s
 let process_smt_declarations (dv : smt_derivation) (ds : list<ST.decl>) : unit =
     let rec aux (i : list<ST.decl>) : unit =
         match i with
-            | ST.DefPrelude :: tl -> aux (ST.preludeDecls @ tl)
             | ST.DeclFun (nm , sg , st , _) :: tl ->
                 let d : smt_uninterpreted = {
                     smt_uninterpreted_name = nm ;
@@ -612,7 +611,6 @@ let smt_derivation_from_declarations (info : smt_derivation_info) (deriv : smt_d
     in
     let rec aux (i : list<ST.decl>) (o : smt_derivation) : smt_derivation =
         match i with
-            | ST.DefPrelude :: tl -> aux (ST.preludeDecls @ tl) o
             | ST.DeclFun (nm , sg , st , _) :: tl ->
                 let sgx : list<sort> = List.map term_sort_to_smt_sort sg in
                 let dx : smt_declaration = SMTFunctionDeclaration (nm , sgx , term_sort_to_smt_sort st) in

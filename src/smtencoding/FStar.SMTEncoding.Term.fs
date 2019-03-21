@@ -133,7 +133,6 @@ type assumption = {
 type decl =
   | FuelDeclaration
   | SortDeclaration of string
-  | DefPrelude
   | GenerateOptions
   | Hardcoded  of string
   | DeclFun    of string * list<sort> * sort * caption
@@ -781,7 +780,6 @@ let caption_to_string (print_captions : bool) : (option<string> -> string)=
 let rec declToSmt' (z3options : string) (print_captions : bool) (decl : decl) : string =
   assign_qids decl ;
   match decl with
-  | DefPrelude -> mkPrelude z3options
   | FuelDeclaration -> "(declare-datatypes () ((Fuel \n\
                                         (ZFuel) \n\
                                         (SFuel (prec Fuel)))))"
