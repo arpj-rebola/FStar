@@ -22,35 +22,35 @@ type smt_term =
     | SMTBinding of quantifier * list<sort> * smt_term
     | SMTFuel of option<smt_term>
 
-let rec string_of_smt_term (k : int) (level : int) (t : smt_term) : string =
-    let new_line (kk : int) : string = "\n" ^ (repeat kk "\t") in
-    match t with
-        | SMTBoundVariable n -> "@@" ^ (string_of_int n)
-        | SMTApplication (Branch , [cond ; thn ; els ]) ->
-            "(" ^ (string_of_smt_term k level cond) ^ " ? " ^ (string_of_smt_term k level thn) ^ " : " ^ (string_of_smt_term k level els) ^ ")"
-        | SMTApplication (o , args) when infix_operator o ->
-            let opening : string = if List.isEmpty args then "" else "(" in
-            let closing : string = if List.isEmpty args then "" else ")" in
-            opening ^ (String.concat (" " ^ (string_of_operator o) ^ " ") (List.map (string_of_smt_term k level) args)) ^ closing
-        | SMTApplication (o , args) ->
-            let opening : string = if List.isEmpty args then "" else "(" in
-            let closing : string = if List.isEmpty args then "" else ")" in
-            let ss : list<string> = (string_of_operator o) :: (List.map (string_of_smt_term k level) args) in
-            opening ^ (String.concat " " ss) ^ closing
-        | SMTInteger s -> s
-        | SMTBoolean true -> "True"
-        | SMTBoolean false -> "False"
-        | SMTBinding (q , bd , scp) ->
-            let (kx , bdx) : int * list<string> =
-                fold_n_map (fun (kk : int) (s : sort) -> (kk + 1 , "(@@" ^ (string_of_int (kk + 1)) ^ " : " ^ (string_of_sort s) ^ ")")) k bd
-            in
-            let ss : list<string> = (string_of_quantifier q) :: bdx in
-            "{" ^ (String.concat " " ss) ^ " ." ^ (new_line (level + 1)) ^ (string_of_smt_term kx (level + 1) scp) ^ (new_line level) ^ "}"
-        | SMTFuel None -> "0F"        
-        | SMTFuel (Some f) -> "(" ^ (string_of_smt_term k level f) ^ " ++ 1F)"
+// let rec string_of_smt_term (k : int) (level : int) (t : smt_term) : string =
+//     let new_line (kk : int) : string = "\n" ^ (repeat kk "\t") in
+//     match t with
+//         | SMTBoundVariable n -> "@@" ^ (string_of_int n)
+//         | SMTApplication (Branch , [cond ; thn ; els ]) ->
+//             "(" ^ (string_of_smt_term k level cond) ^ " ? " ^ (string_of_smt_term k level thn) ^ " : " ^ (string_of_smt_term k level els) ^ ")"
+//         | SMTApplication (o , args) when infix_operator o ->
+//             let opening : string = if List.isEmpty args then "" else "(" in
+//             let closing : string = if List.isEmpty args then "" else ")" in
+//             opening ^ (String.concat (" " ^ (string_of_operator o) ^ " ") (List.map (string_of_smt_term k level) args)) ^ closing
+//         | SMTApplication (o , args) ->
+//             let opening : string = if List.isEmpty args then "" else "(" in
+//             let closing : string = if List.isEmpty args then "" else ")" in
+//             let ss : list<string> = (string_of_operator o) :: (List.map (string_of_smt_term k level) args) in
+//             opening ^ (String.concat " " ss) ^ closing
+//         | SMTInteger s -> s
+//         | SMTBoolean true -> "True"
+//         | SMTBoolean false -> "False"
+//         | SMTBinding (q , bd , scp) ->
+//             let (kx , bdx) : int * list<string> =
+//                 fold_n_map (fun (kk : int) (s : sort) -> (kk + 1 , "(@@" ^ (string_of_int (kk + 1)) ^ " : " ^ (string_of_sort s) ^ ")")) k bd
+//             in
+//             let ss : list<string> = (string_of_quantifier q) :: bdx in
+//             "{" ^ (String.concat " " ss) ^ " ." ^ (new_line (level + 1)) ^ (string_of_smt_term kx (level + 1) scp) ^ (new_line level) ^ "}"
+//         | SMTFuel None -> "0F"        
+//         | SMTFuel (Some f) -> "(" ^ (string_of_smt_term k level f) ^ " ++ 1F)"
 
 type smt_proof =
-    | SMTDefinedMeta of string
+    | SMTMeta of string
     | SMTPremise of string
     | SMTSkolemization of smt_term
     | SMTRewriting of smt_term
@@ -61,145 +61,426 @@ type smt_proof =
     | SMTInstantiation of list<smt_term> * smt_term
     | SMTArithmetics of list<smt_term> * list<smt_term>
 
-let rec string_of_smt_proof (k : int) (level : int) (pf : smt_proof) : string =
-    let new_line (kk : int) : string = "\n" ^ (repeat kk "\t") in
-    match pf with
-        | SMTDefinedMeta s -> "$" ^ s
-        | SMTPremise s -> "[Premise: " ^ s ^ "]"
-        | SMTSkolemization t -> "[Skolem: " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTRewriting t -> "[Rewriting: " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTNnf (ps , t) -> "[Nnf from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTResolution (ps , t) -> "[Resolution from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTCongruence (ps , t) -> "[Congruence from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTGeneralization (p , t) -> "[Generalization from " ^ (string_of_smt_proof k level p) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTInstantiation (ts , t) -> "[Congruence from " ^ (String.concat " , " (List.map (string_of_smt_term k level) ts)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
-        | SMTArithmetics (ts , rs) ->
-            "[Arithmetics from " ^ (String.concat " , " (List.map (string_of_smt_term k level) ts)) ^ " : " ^ (String.concat " , " (List.map (string_of_smt_term k level) rs)) ^ "]"
+// let rec string_of_smt_proof (k : int) (level : int) (pf : smt_proof) : string =
+//     let new_line (kk : int) : string = "\n" ^ (repeat kk "\t") in
+//     match pf with
+//         | SMTDefinedMeta s -> "$" ^ s
+//         | SMTPremise s -> "[Premise: " ^ s ^ "]"
+//         | SMTSkolemization t -> "[Skolem: " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTRewriting t -> "[Rewriting: " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTNnf (ps , t) -> "[Nnf from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTResolution (ps , t) -> "[Resolution from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTCongruence (ps , t) -> "[Congruence from " ^ (String.concat " , " (List.map (string_of_smt_proof k level) ps)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTGeneralization (p , t) -> "[Generalization from " ^ (string_of_smt_proof k level p) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTInstantiation (ts , t) -> "[Congruence from " ^ (String.concat " , " (List.map (string_of_smt_term k level) ts)) ^ " : " ^ (string_of_smt_term k level t) ^ "]"
+//         | SMTArithmetics (ts , rs) ->
+//             "[Arithmetics from " ^ (String.concat " , " (List.map (string_of_smt_term k level) ts)) ^ " : " ^ (String.concat " , " (List.map (string_of_smt_term k level) rs)) ^ "]"
 
-type smt_pt = either<smt_proof , smt_term>
+// type smt_pt = either<smt_proof , smt_term>
+
+type smt_pt =
+    | SMTTerm of smt_term
+    | SMTProof of smt_proof
+
+let as_proof (pt : smt_pt) : smt_proof =
+    match pt with
+        | SMTTerm t -> failwith "Tried to assign proof type to a term"
+        | SMTProof p -> p
+
+let as_term (pt : smt_pt) : smt_proof =
+    match pt with
+        | SMTTerm t -> t
+        | SMTProof p -> failwith "Tried to assign term type to a proof"
+
+type smt_uninterpreted = {
+    smt_uninterpreted_name : string ;
+    smt_uninterpreted_signature : list<sort> ;
+    smt_uninterpreted_sort : sort ;
+}
+
+type smt_term_macro = {
+    smt_term_macro_name : string ;
+    smt_term_macro_arguments : int ;
+    smt_term_macro_definition : smt_term ;
+    smt_term_macro_fundef : bool ;
+}
+
+type smt_meta_macro = {
+    smt_meta_macro_name : string ;
+    smt_meta_macro_arguments : int ;
+    smt_meta_macro_definition : smt_proof ;
+}
 
 type smt_declaration =
-    | SMTFunctionDeclaration of string * list<sort> * sort
-    | SMTMacroDefinition of string * list<sort> * sort * smt_term
-    | SMTTermDefinition of string * list<sort> * smt_term
-    | SMTMetaDefinition of string * smt_proof
+    | SMTUninterpretedFunction of smt_uninterpreted ;
+    | SMTTermMacro of smt_term_macro ;
+    | SMTMetaMacro of smt_meta_macro
 
-type smt_derivation = list<string>
-
-type smt_derivation_info = {
-    smt_derivation_info_table : smap<smt_declaration> ;
-    smt_derivation_info_assertions : ref<(list<(int * string)>)> ;
-    smt_derivation_info_count : ref<int> ;
+type smt_derivation = {
+    smt_derivation_table : smap<smt_declaration> ;
+    smt_derivation_assertions : ref<(list<string>)> ;
+    smt_derivation_count : ref<int> ;
+    smt_derivation_sequence : ref<(list<string>)> ;
 }
 
-let string_of_smt_derivation (info : smt_derivation_info) (dv : smt_derivation) : string =
-    let aux_signature (sg : list<sort>): string =
-        let f (k : int) (s : sort) : int * string = (k + 1 , "(@@" ^ (string_of_int (k + 1)) ^ " : " ^ (string_of_sort s) ^ ")") in
-        let (_ , ss) : int * list<string> = fold_n_map f 0 sg in
-        String.concat " " ss
-    in
-    let aux_decl (d : smt_declaration) : string =
-        match d with
-            | SMTFunctionDeclaration (nm , sg , st) ->
-                "[Declare] " ^ nm ^ " : " ^ (String.concat " * " (List.map string_of_sort sg)) ^ (if List.isEmpty sg then "" else " -> ") ^ (string_of_sort st) ^ "\n"
-            | SMTMacroDefinition (nm , sg , _ , df) ->
-                "[Define ] #" ^ nm ^ " " ^ (aux_signature sg) ^ (if List.isEmpty sg then "" else " ") ^ ":=\n\t" ^ (string_of_smt_term (List.length sg) 1 df) ^ "\n"
-            | SMTTermDefinition (nm , sg , df) ->
-                "[Define ] $" ^ nm ^ " " ^ (aux_signature sg) ^ (if List.isEmpty sg then "" else " ") ^ ":=\n\t" ^ (string_of_smt_term (List.length sg) 1 df) ^ "\n"
-            | SMTMetaDefinition (nm , df) ->
-                "[Define ] &" ^ nm ^ " :=\n\t" ^ (string_of_smt_proof 0 1 df) ^ "\n"
-    in
-    let aux_main (o : list<string>) (s : string) : list<string> =
-        match smap_try_find info.smt_derivation_info_table s with
-            | None -> failwith "Could not find derivation identifier in derivation table"
-            | Some d -> (aux_decl d) :: o
-    in
-    let dcs : list<string> = List.fold_left aux_main [] dv in
-    let ass : list<string> = List.map (fun ((_ , s) : int * string) -> "[Premise] " ^ s) !(info.smt_derivation_info_assertions) in
-    String.concat "\n" (dcs @ ass)  
+// let string_of_smt_derivation (info : smt_derivation_info) (dv : smt_derivation) : string =
+//     let aux_signature (sg : list<sort>): string =
+//         let f (k : int) (s : sort) : int * string = (k + 1 , "(@@" ^ (string_of_int (k + 1)) ^ " : " ^ (string_of_sort s) ^ ")") in
+//         let (_ , ss) : int * list<string> = fold_n_map f 0 sg in
+//         String.concat " " ss
+//     in
+//     let aux_decl (d : smt_declaration) : string =
+//         match d with
+//             | SMTFunctionDeclaration (nm , sg , st) ->
+//                 "[Declare] " ^ nm ^ " : " ^ (String.concat " * " (List.map string_of_sort sg)) ^ (if List.isEmpty sg then "" else " -> ") ^ (string_of_sort st) ^ "\n"
+//             | SMTMacroDefinition (nm , sg , _ , df) ->
+//                 "[Define ] #" ^ nm ^ " " ^ (aux_signature sg) ^ (if List.isEmpty sg then "" else " ") ^ ":=\n\t" ^ (string_of_smt_term (List.length sg) 1 df) ^ "\n"
+//             | SMTTermDefinition (nm , sg , df) ->
+//                 "[Define ] $" ^ nm ^ " " ^ (aux_signature sg) ^ (if List.isEmpty sg then "" else " ") ^ ":=\n\t" ^ (string_of_smt_term (List.length sg) 1 df) ^ "\n"
+//             | SMTMetaDefinition (nm , df) ->
+//                 "[Define ] &" ^ nm ^ " :=\n\t" ^ (string_of_smt_proof 0 1 df) ^ "\n"
+//     in
+//     let aux_main (o : list<string>) (s : string) : list<string> =
+//         match smap_try_find info.smt_derivation_info_table s with
+//             | None -> failwith "Could not find derivation identifier in derivation table"
+//             | Some d -> (aux_decl d) :: o
+//     in
+//     let dcs : list<string> = List.fold_left aux_main [] dv in
+//     let ass : list<string> = List.map (fun ((_ , s) : int * string) -> "[Premise] " ^ s) !(info.smt_derivation_info_assertions) in
+//     String.concat "\n" (dcs @ ass)  
 
-let new_smt_derivation_info () : smt_derivation_info = {
-    smt_derivation_info_table = smap_create 1000 ;
-    smt_derivation_info_assertions = mk_ref [] ;
-    smt_derivation_info_count = mk_ref 0
+let new_smt_derivation () : smt_derivation = {
+    smt_derivation_table = smap_create 1000 ;
+    smt_derivation_assertions = mk_ref [] ;
+    smt_derivation_count = mk_ref 0 ;
+    smt_derivation_sequence = mk_ref [] ;
 }
 
-let unroll_term (info : smt_derivation_info) (tm : smt_term) : smt_term =
-    let rec aux (n : int) (pars : list<smt_term>) (t : smt_term) : smt_term =
-        match t with
-            | SMTBoundVariable x -> if x < n then List.nth pars x else SMTBoundVariable (x - n)
-            | SMTApplication (o , args) -> begin
-                let argsx : list<smt_term> = List.map (aux n pars) args in
-                match o with
-                    | Macro s
-                    | DefinedTerm s -> begin match smap_try_find info.smt_derivation_info_table s with
-                        | Some (SMTTermDefinition (_ , _ , tx))
-                        | Some (SMTMacroDefinition (_ , _ , _ , tx)) -> aux (List.length argsx) argsx tx
-                        | _ -> failwith "Used DefinedTerm/Macro constructor for a parameter that does not correspond to a term definition or a function macro"
-                    end
-                    | _ -> SMTApplication (o , argsx)
+let add_to_table (dv : smt_derivation) (nm : string) (d : smt_declaration) : unit =
+    match smap_try_find dv.smt_derivation_table nm with
+        | Some _ -> failwith ("Tried to introduce identifier " ^ nm ^ " but it already occurs in the table")
+        | None ->
+            let ls : ref<(list<string>)> = dv.smt_derivation_sequence in
+            ls := nm :: !ls ;
+            smap_add dv.smt_derivation_table nm d ;
+
+
+let add_to_assertions (dv : smt_derivation) (nm : string) (d : smt_declaration) : unit =
+    let ls : ref<(list<string>)> = dv.smt_derivation_assertions in
+    ls := nm :: !ls
+
+let find_in_table (dv : smt_derivation) (nm : string) : option<smt_declaration> =
+    smap_try_find dv.smt_derivation_table nm
+
+let new_name (dv : smt_derivation) (prefix : string) : string =
+    let x : int = !(dv.smt_derivation_count) in
+    incr dv.smt_derivation_count ;
+    prefix ^ (string_of_int x)
+
+let new_term_name (dv : smt_derivation) : string = new_name dv "$tm"
+let new_proof_name (dv : smt_derivation) : string = new_name dv "$pf"
+let new_skolem_name (dv : smt_derivation) : string = new_name dv "$sk"
+let is_term_name (s : string) : bool = starts_with s "$tm"
+let is_proof_name (s : string) : bool = starts_with s "$pf"
+let is_skolem_name (s : string) : bool = starts_with s "$sk"
+
+let arguments_from_context (n : int) (ctx: list<smt_term>) : list<smt_term> =
+    let rec aux (m : int) (i : list<smt_term>) (o : smt_term) : list<smt_term> =
+        if m <= 0 then List.rev o else aux (m - 1) (List.tl i) ((List.hd i) :: o)
+    in
+    aux n ctx []
+
+let add_to_context (n : int) (ctx : list<smt_term>) : list<smt_term> =
+    let nn : int = List.length ctx in
+    let rec aux (m : int) (acc : list<smt_term>) : list<smt_term> =
+        if m < n then aux (m + 1) ((SMTBoundVariable (m + nn)) :: acc) else List.rev acc
+    in
+    ctx @ (aux 0 [])
+
+let term_sort_to_smt_sort (s : ST.sort) : sort =
+    match s with
+        | ST.Bool_sort -> Boolean
+        | ST.Int_sort -> Integer
+        | ST.String_sort -> String
+        | ST.Term_sort -> Term
+        | ST.Fuel_sort -> Fuel
+        | _ -> failwith "Unrecognized sort"
+
+let term_operator_to_smt_operator (o : ST.op) : operator =
+    match o with
+        | ST.Not -> Negation
+        | ST.And -> Conjunction
+        | ST.Or -> Disjunction
+        | ST.Imp -> Implication
+        | ST.Iff -> Equality
+        | ST.ITE -> Branch
+        | ST.Eq -> Equality
+        | ST.LT -> LtInequality
+        | ST.LTE -> LeqInequality
+        | ST.GT -> GtInequality
+        | ST.GTE -> GeqInequality
+        | ST.Add -> Addition
+        | ST.Mul -> Product
+        | ST.Div -> Division
+        | ST.Minus -> Opposite
+        | ST.Sub -> Substraction
+        | ST.Mod -> Remainder
+        | ST.TrueOp
+        | ST.FalseOp -> failwith "Boolean term operators cannot be matched to SMT operators"
+        | ST.BvAnd
+        | ST.BvXor
+        | ST.BvOr
+        | ST.BvAdd
+        | ST.BvSub
+        | ST.BvShl
+        | ST.BvShr
+        | ST.BvUdiv
+        | ST.BvMod
+        | ST.BvMul
+        | ST.BvUlt
+        | ST.BvToNat
+        | ST.BvUext _
+        | ST.NatToBv _ -> failwith "Bit-vector term operators cannot be matched to SMT operators"
+        | ST.Var _ -> failwith "Uninterpreted term operators cannot be immediately matched to SMT operators"
+
+let term_quantifier_to_smt_quantifier (q : ST.qop) : quantifier =
+    match q with
+        | ST.Forall -> Forall
+        | ST.Exists -> Exists
+
+let term_term_to_smt_term (dv : smt_derivation) (id : string) (tm : ST.term) : smt_term =
+    let count : ref<int> = mk_ref 0 in
+    let aux (mt : list<(either<string , int>)>) (ctx : list<smt_term>) (t : ST.term) : smt_term =
+        match t.tm with
+            | ST.Integer s -> SMTInteger s
+            | ST.BoundV n -> begin match List.nth mt n with
+                | Inl s -> begin match find_in_table dv s with
+                    | Some (SMTTermMacro mc) ->
+                        let arity : int = mc.smt_term_macro_arguments in
+                        SMTApplication (Macro s , arguments_from_context arity ctx)
+                    | _ -> failwith ("Could not appropriately match identifier '" ^ s ^ "' in the table")
+                end
+                | Inr k -> SMTBoundVariable k
             end
-            | SMTBinding (q , bs , scp) -> SMTBinding (q , bs , aux n pars scp)
-            | SMTFuel (Some f) -> SMTFuel (Some (aux n pars f))
-            | _ -> t
+            | ST.App (TrueOp , _) -> SMTBoolean true
+            | ST.App (FalseOp , _) -> SMTBoolean false
+            | ST.App (ST.Var "ZFuel" , _) -> SMTFuel None
+            | ST.App (ST.Var "SFuel" , args) -> SMTFuel (Some (aux mt ctx (List.hd args)))
+            | ST.App (ST.Var s , args) -> begin match find_in_table dv s with
+                | Some (SMTUninterpretedFunction uf) ->
+                    SMTApplication (s , List.map (aux mt ctx) args)
+                | Some (SMTTermMacro mc) when mc.smt_term_macro_fundef ->
+                    SMTApplication (Macro s , List.map (aux mt ctx) args)
+                | _ -> failwith ("Could not appropriately match identifier '" ^ s ^ "' in the table")
+            end
+            | ST.Quant (q , _ , _ , bd , scp) ->
+                let q' : quantifier = term_quantifier_to_smt_quantifier q in
+                let bd' : list<sort> = List.map term_sort_to_smt_sort bd in
+                let mt' : list<(either<string , int>)> = 
+                    let bdl : int = List.length bd ;
+                    let rec f (n : int) (c : int) (o : list<(either<string , int>)>) : list<(either<string , int>)> =
+                        if n < bdl then f (n + 1) (c + 1) ((Inr c) :: o) else List.rev o
+                    in
+                    mt @ (List.rev (f 0 (List.length ctx + 1) []))
+                in
+                let scp' : smt_term = aux mt' (ctx @ bd') scp in
+                SMTBinding (q' , bd' , scp')
+            | ST.Let (bd , scp) ->
+                let n : int = List.length ctx in
+                let mt' : list<(either<string , int>)> =
+                    let f (b : ST.term) : either<string , int> =
+                        let df : smt_term = aux mt ctx b in
+                        incr count ;
+                        let nm : string = "$" ^ id ^ "#" ^ (string_of_int !count) in
+                        let mc : smt_term_macro = {
+                            smt_term_macro_name = nm ;
+                            smt_term_macro_arguments = n ;
+                            smt_term_macro_definition = df ;
+                        }
+                        add_to_table nm (SMTTermMacro mc) ;
+                        Inl nm
+                    in
+                    mt @ (List.map f bd)
+                in
+                let ctx' : list<smt_term> = add_to_context (List.length bd) ctx in
+                aux mt' ctx' scp
+            | ST.Labeled (tmx , _ , _)
+            | ST.LblPos (tmx , _) -> aux mt ctx tmx
+            | ST.FreeV (s , _) -> begin match find_in_table dv s with
+                | Some (SMTUninterpretedFunction uf) ->
+                    SMTApplication (Uninterpreted uf.smt_uninterpreted_name , [])
+                | Some (SMTTermMacro mc) ->
+                    SMTApplication (Macro mc.smt_term_macro_name , [])
+                | _ -> failwith "Free variables should not occur in closed SMT terms"
+            end
     in
-    aux 0 [] tm
+    count := 0 ;
+    aux [] [] tm        
 
-let hash_of_smt_term (info : smt_derivation_info) (tm : smt_term) : int =
-    let hash_of_int_list (l : list<int>) : int =
-        let aux ((sum , prod , xoor) : int * int * int) (x : int) : int * int * int =
-            (sum + x , prod * x , xoor ^^^ x)
-        in
-        let (s , p , x) : int * int * int = List.fold_left aux (0 , 1 , 0) l in
-        1023 * s + p ^^^ (31 * x)
+let process_smt_declarations (dv : smt_derivation) (ds : list<ST.decl>) : unit =
+    let rec aux (i : list<ST.decl>) : unit =
+        match i with
+            | ST.DefPrelude :: tl -> aux (ST.preludeDecls @ tl)
+            | ST.DeclFun (nm , sg , st , _) :: tl ->
+                let d : smt_uninterpreted = {
+                    smt_uninterpreted_name = nm ;
+                    smt_uninterpreted_signature = List.map term_sort_to_smt_sort sg ;
+                    smt_uninterpreted_sort = term_sort_to_smt_sort st ;
+                } in
+                add_to_table dv d ;
+                aux tl
+            | ST.DefineFun (nm , sg , st , tm , _) :: tl ->
+                let d : smt_term_macro = {
+                    smt_term_macro_name = nm ;
+                    smt_term_macro_arguments = List.length sg ;
+                    smt_term_macro_definition = term_term_to_smt_term dv nm tm ;
+                    smt_term_macro_fundef = true ;
+                } in
+                add_to_table dv d ;
+                aux tl
+            | ST.Assume a :: tl ->
+                let nm : string = a.assumption_name in
+                let d : smt_term_macro = {
+                    smt_term_macro_name = nm ;
+                    smt_term_macro_arguments = 0 ;
+                    smt_term_macro_definition = term_term_to_smt_term dv nm a.assumption_term ;
+                } in
+                add_to_table dv d ;
+                add_to_assertions dv nm ;
+                aux tl
+            | ST.Module (_ , l) :: tl -> aux (l @ tl)
+            | _ :: tl -> aux tl
+            | [] -> ()
+    aux ds    
+
+type renaming = {
+    renaming_staging : ref<(list<(list<string>)>)> ;
+    renaming_dictionary : smap<(ref<(list<(either<string , int>)>)>)> ;
+}
+
+let push_stage (rn : renaming) : unit =
+    rn.renaming_staging := [] :: !(rn.renaming_staging) ;
+
+let pull_stage (rn : renaming) : unit =
+    let stg : list<(list<string>)> = !(rn.renaming_staging) in
+    let vars : list<string> = List.hd stg in
+    rn.renaming_staging := List.tl stg ;
+    let f (var : string) : unit = match smap_try_find rn.renaming_dictionary var with
+        | Some stkref -> stkref := List.tl !(stkref)
+        | None -> failwith ("Tried to pop variable '" ^ var ^ "' from dictionary but it wasn't there")
     in
-    let rec hash_list_of_smt_term (t : smt_term) : list<int> =
-        match t with
-            | SMTBoundVariable x -> [500 + x]
-            | SMTApplication (o , args) -> (hash_of_operator o) @ List.concat (List.map hash_list_of_smt_term args)
-            | SMTInteger s -> [310 ; hashcode s]
-            | SMTBoolean true -> [311]
-            | SMTBoolean false -> [312]
-            | SMTBinding (q , bs , scp) -> ((hash_of_quantifier q) :: (List.map hash_of_sort bs)) @ (hash_list_of_smt_term scp)
-            | SMTFuel None -> [313]
-            | SMTFuel (Some f) -> 314 :: (hash_list_of_smt_term f)
+    List.iter f vars
+
+let add_renaming (rn : renaming) (var : string) (nm : either<string , int>) : unit =
+    let stg : list<(list<string>)> = !(rn.renaming_staging) in
+    let stkref : ref<(list<(either<string , int>)>)> = smap_try_find rn.renaming_dictionary var with
+        | Some rf -> rf
+        | None ->
+            let rf : ref<(list<(either<string , int>)>)> = mk_ref [] in
+            smap_add rn.renaming_dictionary var rf ;
+            rf
     in
-    tm |> unroll_term info |> hash_list_of_smt_term |> hash_of_int_list
+    rn.renaming_staging := (var :: (List.hd stg)) :: (List.tl stg) ;
+    rf := nm :: !rf
 
-let equal_smt_terms (info : smt_derivation_info) (tm1 : smt_term) (tm2 : smt_term) : bool =
-    (unroll_term info tm1) = (unroll_term info tm2)
+let get_renaming (rn : renaming) (var : string) : option<(either<string , int>)> =
+    match smap_try_find rn.renaming_dictionary var with
+        | Some rf -> Some (List.hd !rf)
+        | None -> None
+
+let process_raw_function (rn : renaming) (dv : smt_derivation) ((var , sg , st) : string * list<sort> * sort) : unit =
+    let nm : string = new_skolem_name dv in
+    let d : smt_uninterpreted = {
+        smt_uninterpreted_name = nm ;
+        smt_uninterpreted_signature = List.map term_sort_to_smt_sort sg ;
+        smt_uninterpreted_sort = term_sort_to_smt_sort st ;
+    } in
+    add_renaming rn var (Inl nm) ;
+    add_to_table dv d
+
+let raw_proof_to_smt_proof (rn : renaming) (dv : smt_derivation) (rpf : raw_proof) : smt_pt =
+    let aux (ctx : list<smt_term>) (rp : raw_proof) : smt_pt =
+        match rp with
+            | RawFuel o ->
+                let o' : option<smt_term> = bind_opt o (fun (r : raw_proof) -> as_term (aux rn dv r)) in
+                SMTTerm (SMTFuel (o'))
+            | RawAbstractVar k -> TODO
+            | RawApplication (Uninterpreted f , args) -> begin match get_renaming rn f with
+                | Some (Inl f') ->
+                    if is_skolem_name f' then
+                        let args' : list<smt_term> = args |> List.map (aux ctx) |> as_term in
+                        SMTTerm (SMTApplication (Uninterpreted f' , args'))
+                    else aux ctx (RawApplication (Macro f' , args))
+                | Some (Inr k) -> SMTTerm (SMTBoundVariable k)
+                | None -> aux ctx (RawApplication (Macro f , args))
+            end
+            | RawApplication (Macro f , args) -> begin match find_in_table dv f with
+                let args' : list<smt_term> = args |> List.map (aux ctx) |> as_term in
+                | Some (SMTUninterpretedFunction uf) ->
+                    SMTTerm (SMTApplication (Uninterpreted f , args'))
+                | Some (SMTTermMacro mc) ->
+                    if mc.smt_term_macro_fundef then
+                        SMTTerm (SMTApplication (Macro f , args'))
+                    else
+                        let k : int = mc.smt_term_macro_arguments in
+                        SMTTerm (SMTApplication (Macro f , arguments_from_context k ctx))
+                | Some (SMTMetaMacro mc) -> SMTProof (SMTMeta f)
+                | None -> failwith ("Could not find macro identifier '" ^ f ^ "' in table")
+            end
+            | RawApplication (o , args) ->
+                let args' : list<smt_term> = args |> List.map (aux ctx) |> as_term in
+                SMTTerm (SMTApplication (o , args'))
+
+                
 
 
-let add_to_table (info : smt_derivation_info) (nm : string) (d : smt_declaration) : unit =
-    match smap_try_find info.smt_derivation_info_table nm with
-        | Some _ -> failwith ("Repeated identifier " ^ nm)
-        | None -> smap_add info.smt_derivation_info_table nm d
 
-let add_to_assertions (info : smt_derivation_info) (nm : string) (tm : smt_term) : unit =
-    if for_some (fun (h , s) -> s = nm) !(info.smt_derivation_info_assertions) then
-        failwith "Repeated assertion name"
-    else
-        info.smt_derivation_info_assertions := (hash_of_smt_term info tm , nm) :: !(info.smt_derivation_info_assertions) 
 
-let new_name (info : smt_derivation_info) : string =
-    info.smt_derivation_info_count := !(info.smt_derivation_info_count) + 1 ;
-    string_of_int !(info.smt_derivation_info_count)
+// let unroll_term (info : smt_derivation_info) (tm : smt_term) : smt_term =
+//     let rec aux (n : int) (pars : list<smt_term>) (t : smt_term) : smt_term =
+//         match t with
+//             | SMTBoundVariable x -> if x < n then List.nth pars x else SMTBoundVariable (x - n)
+//             | SMTApplication (o , args) -> begin
+//                 let argsx : list<smt_term> = List.map (aux n pars) args in
+//                 match o with
+//                     | Macro s
+//                     | DefinedTerm s -> begin match smap_try_find info.smt_derivation_info_table s with
+//                         | Some (SMTTermDefinition (_ , _ , tx))
+//                         | Some (SMTMacroDefinition (_ , _ , _ , tx)) -> aux (List.length argsx) argsx tx
+//                         | _ -> failwith "Used DefinedTerm/Macro constructor for a parameter that does not correspond to a term definition or a function macro"
+//                     end
+//                     | _ -> SMTApplication (o , argsx)
+//             end
+//             | SMTBinding (q , bs , scp) -> SMTBinding (q , bs , aux n pars scp)
+//             | SMTFuel (Some f) -> SMTFuel (Some (aux n pars f))
+//             | _ -> t
+//     in
+//     aux 0 [] tm
 
-let new_term_name (info : smt_derivation_info) : string * string =
-    let nm : string = new_name info in
-    (nm , "<T>" ^ nm)
+// let hash_of_smt_term (info : smt_derivation_info) (tm : smt_term) : int =
+//     let hash_of_int_list (l : list<int>) : int =
+//         let aux ((sum , prod , xoor) : int * int * int) (x : int) : int * int * int =
+//             (sum + x , prod * x , xoor ^^^ x)
+//         in
+//         let (s , p , x) : int * int * int = List.fold_left aux (0 , 1 , 0) l in
+//         1023 * s + p ^^^ (31 * x)
+//     in
+//     let rec hash_list_of_smt_term (t : smt_term) : list<int> =
+//         match t with
+//             | SMTBoundVariable x -> [500 + x]
+//             | SMTApplication (o , args) -> (hash_of_operator o) @ List.concat (List.map hash_list_of_smt_term args)
+//             | SMTInteger s -> [310 ; hashcode s]
+//             | SMTBoolean true -> [311]
+//             | SMTBoolean false -> [312]
+//             | SMTBinding (q , bs , scp) -> ((hash_of_quantifier q) :: (List.map hash_of_sort bs)) @ (hash_list_of_smt_term scp)
+//             | SMTFuel None -> [313]
+//             | SMTFuel (Some f) -> 314 :: (hash_list_of_smt_term f)
+//     in
+//     tm |> unroll_term info |> hash_list_of_smt_term |> hash_of_int_list
 
-let new_proof_name (info : smt_derivation_info) : string * string =
-    let nm : string = new_name info in
-    (nm , "<P>" ^ nm)
+// let equal_smt_terms (info : smt_derivation_info) (tm1 : smt_term) (tm2 : smt_term) : bool =
+//     (unroll_term info tm1) = (unroll_term info tm2)
 
-let new_skolem_name (info : smt_derivation_info) : string =
-    "?" ^ (new_name info)
-
-let is_proof (s : string) : bool = starts_with s "<P>"
-let is_term (s : string) : bool = starts_with s "<T>"
-
-let get_name (s : string) : string = substring_from s 3
 
 type staging = list<(list<string>)>
 type matching = either<(string * list<smt_term>) , int>
@@ -223,7 +504,7 @@ let smt_derivation_from_declarations (info : smt_derivation_info) (deriv : smt_d
             | ST.And -> Conjunction
             | ST.Or -> Disjunction
             | ST.Imp -> Implication
-            | ST.Iff -> Biimplication
+            | ST.Iff -> Equality
             | ST.ITE -> Branch
             | ST.Eq -> Equality
             | ST.LT -> LtInequality

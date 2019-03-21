@@ -18,7 +18,6 @@ type operator =
     | Disjunction
     | Negation
     | Implication
-    | Biimplication
     | Branch
     | Equality
     | Equivalence
@@ -50,6 +49,7 @@ val hash_of_quantifier : quantifier -> int
 
 type raw_proof =
     | RawFuel of option<raw_proof>
+    | RawAbstractVar of int
     | RawApplication of operator * list<raw_proof>
     | RawBinding of quantifier * list<(string * sort)> * raw_proof
     | RawLet of list<(string * raw_proof)> * raw_proof

@@ -69,6 +69,7 @@ let char = ['a'-'z' 'A'-'Z' '@' '|' '%' '_' '.' '>' '=' '<' '!' '$' '#' '+' '-' 
 let weird = [':']
 let ident = char(char|digit|weird)*
 let symbol = ':'ident
+let qvar = '?'digit(digit)*
 let whitespace = [' ' '\t']
 let comment = ';'[^'\n' '\r']*
 let newline = ('\n' | '\r' '\n')
@@ -79,8 +80,9 @@ rule tokenize = parse
 | comment { tokenize lexbuf }
 | int { INT(lexeme lexbuf) }
 | symbol { match keywords.TryFind(lexeme lexbuf) with   
-               | Some(token) -> token   
+               | Some(token) -> token
                | None -> ID(lexeme lexbuf) }
+| qvar { QVAR(lexeme lexbuf) }
 | '(' { LPAREN }
 | ')' { RPAREN }
 | ident { match keywords.TryFind(lexeme lexbuf) with   

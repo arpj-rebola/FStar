@@ -8,6 +8,7 @@ open FStar.Util
 %token PROOF FUNCTION
 %token <string> ID
 %token <string> INT
+%token <string> QVAR
 %token TRUE FALSE
 %token ANNOTATION PATTERN QID
 %token PARAMETRIC
@@ -46,6 +47,8 @@ proofs:
 proof:
     | ID
         { RawApplication (Uninterpreted $1 , []) }
+    | QVAR
+        { RawAbstractVar (int_of_string $1) }
     | ZERO_FUEL
         { RawFuel None }
     | LPAREN NEXT_FUEL proof RPAREN
@@ -149,7 +152,7 @@ operator:
   | IMPLIES
       { Implication }
   | IFF
-      { Biimplication }
+      { Equality }
   | ITE
       { Branch }
   | EQUAL

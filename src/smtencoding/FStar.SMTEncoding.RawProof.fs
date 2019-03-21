@@ -30,14 +30,12 @@ let hash_of_sort (s : sort) : int =
         | String -> 102
         | Integer -> 103
         | Term -> 104
-        | Proof -> 105
 
 type operator =
     | Conjunction
     | Disjunction
     | Negation
     | Implication
-    | Biimplication
     | Branch
     | Equality
     | Equivalence
@@ -52,7 +50,6 @@ type operator =
     | Division
     | Remainder
     | Macro of string
-    | DefinedTerm of string
     | Uninterpreted of string
 
 let hash_of_operator (o : operator) : list<int> =
@@ -61,7 +58,6 @@ let hash_of_operator (o : operator) : list<int> =
         | Disjunction -> [201]
         | Negation -> [202]
         | Implication -> [203]
-        | Biimplication -> [204]
         | Branch -> [205]
         | Equality -> [206]
         | Equivalence -> [207]
@@ -76,8 +72,7 @@ let hash_of_operator (o : operator) : list<int> =
         | Division -> [216]
         | Remainder -> [217]
         | Uninterpreted s -> [218 ; hashcode s]
-        | Macro s
-        | DefinedTerm s -> failwith "Cannot compute a parametric hash of an operator"
+        | Macro s -> failwith "Cannot compute a parametric hash of an operator"
 
 let string_of_operator (o : operator) : string =
     match o with
@@ -85,7 +80,6 @@ let string_of_operator (o : operator) : string =
         | Disjunction -> "\\/"
         | Negation -> "!"
         | Implication -> "=>"
-        | Biimplication -> "<==>"
         | Branch -> "ITE"
         | Equality -> "="
         | Equivalence -> "~"
@@ -99,16 +93,14 @@ let string_of_operator (o : operator) : string =
         | Opposite -> "-"
         | Division -> "/"
         | Remainder -> "%"
-        | Macro s -> "#" ^ s
-        | DefinedTerm s -> "$" ^ s
         | Uninterpreted s -> s
+        | Macro s -> s
 
 let infix_operator (o : operator) : bool =
     match o with
         | Conjunction
         | Disjunction
         | Implication
-        | Biimplication
         | Equality
         | Equivalence
         | LeqInequality
@@ -140,6 +132,7 @@ let string_of_quantifier (q : quantifier) : string =
 
 type raw_proof =
     | RawFuel of option<raw_proof>
+    | RawAbstractVar of int
     | RawApplication of operator * list<raw_proof>
     | RawBinding of quantifier * list<(string * sort)> * raw_proof
     | RawLet of list<(string * raw_proof)> * raw_proof
@@ -159,6 +152,7 @@ let rec string_of_raw_proof (level : int) (p : raw_proof) : string =
     match p with
         | RawFuel (None) -> "ZFuel"
         | RawFuel (Some p) -> "(SFuel " ^ (string_of_raw_proof level p) ^ ")"
+        | RawAbstractVar n -> "?" ^ (string_of_int n)
         | RawApplication (o , args) -> "(" ^ (string_of_operator o) ^ " " ^ (String.concat " " (List.map (string_of_raw_proof level) args)) ^ ")"
         | RawBinding (q , bs , scp) ->
             let bs_s : list<string> = List.map (fun ((var , st) : string * sort) -> "(" ^ var ^ " " ^ (string_of_sort st)) bs in
@@ -190,26 +184,26 @@ let string_of_raw_proof_section ((funs , pf) : raw_proof_section) : string =
     let strings : list<string> = (List.map printfun funs) @ [string_of_raw_proof 0 pf] in
     String.concat "\n" strings
 
-let unroll_lets (p : raw_proof) : raw_proof =
-    let rec aux (rnm : list<(string * raw_proof)>) (pf : raw_proof) : raw_proof =
-        match pf with
-            | RawApplication (Uninterpreted s , []) -> begin
-                match find_opt (fun ((ss , _) : string * raw_proof) -> s = ss) rnm with
-                    | Some (ss , lt) -> lt
-                    | None -> pf
-            end
-            | RawApplication (o , args) -> RawApplication (o , List.map (aux rnm) args)
-            | RawBinding (q , bs , scp) -> RawBinding (q , bs , aux rnm scp)
-            | RawLet (bs , scp) -> aux (rnm @ (List.map (fun ((s , t) : string * raw_proof) -> (s , aux rnm t)) bs)) scp
-            | RawPremise px -> RawPremise (aux rnm px)
-            | RawSkolemization px -> RawSkolemization (aux rnm px)
-            | RawRewriting px -> RawRewriting (aux rnm px)
-            | RawNnf (px , r) -> RawNnf (List.map (aux rnm) px , aux rnm r)
-            | RawResolution (px , r) -> RawResolution (List.map (aux rnm) px , aux rnm r)
-            | RawCongruence (px , r) -> RawCongruence (List.map (aux rnm) px , aux rnm r)
-            | RawGeneralization (px , r) -> RawGeneralization (aux rnm px , aux rnm r)
-            | RawInstantiation (px , r) -> RawInstantiation (List.map (aux rnm) px , aux rnm r)
-            | RawArithmetics (px , rx) -> RawArithmetics (List.map (aux rnm) px , List.map (aux rnm) rx)
-            | _ -> pf
-    in
-    aux [] p
+// let unroll_lets (p : raw_proof) : raw_proof =
+//     let rec aux (rnm : list<(string * raw_proof)>) (pf : raw_proof) : raw_proof =
+//         match pf with
+//             | RawApplication (Uninterpreted s , []) -> begin
+//                 match find_opt (fun ((ss , _) : string * raw_proof) -> s = ss) rnm with
+//                     | Some (ss , lt) -> lt
+//                     | None -> pf
+//             end
+//             | RawApplication (o , args) -> RawApplication (o , List.map (aux rnm) args)
+//             | RawBinding (q , bs , scp) -> RawBinding (q , bs , aux rnm scp)
+//             | RawLet (bs , scp) -> aux (rnm @ (List.map (fun ((s , t) : string * raw_proof) -> (s , aux rnm t)) bs)) scp
+//             | RawPremise px -> RawPremise (aux rnm px)
+//             | RawSkolemization px -> RawSkolemization (aux rnm px)
+//             | RawRewriting px -> RawRewriting (aux rnm px)
+//             | RawNnf (px , r) -> RawNnf (List.map (aux rnm) px , aux rnm r)
+//             | RawResolution (px , r) -> RawResolution (List.map (aux rnm) px , aux rnm r)
+//             | RawCongruence (px , r) -> RawCongruence (List.map (aux rnm) px , aux rnm r)
+//             | RawGeneralization (px , r) -> RawGeneralization (aux rnm px , aux rnm r)
+//             | RawInstantiation (px , r) -> RawInstantiation (List.map (aux rnm) px , aux rnm r)
+//             | RawArithmetics (px , rx) -> RawArithmetics (List.map (aux rnm) px , List.map (aux rnm) rx)
+//             | _ -> pf
+//     in
+//     aux [] p
