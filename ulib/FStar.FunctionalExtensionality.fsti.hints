@@ -1,0 +1,29 @@
+[
+  "uê^xì;IE\u0015\u0001ÀTçcr~",
+  [
+    [
+      "FStar.FunctionalExtensionality.on_dom",
+      1,
+      0,
+      0,
+      [
+        "@query", "equation_FStar.FunctionalExtensionality.is_restricted",
+        "lemma_FStar.FunctionalExtensionality.idempotence_on_domain"
+      ],
+      0,
+      "32ed00c6c202a37c808894e6dc5baa0d"
+    ],
+    [
+      "FStar.FunctionalExtensionality.on_dom_g",
+      1,
+      0,
+      0,
+      [
+        "@query", "equation_FStar.FunctionalExtensionality.is_restricted_g",
+        "lemma_FStar.FunctionalExtensionality.idempotence_on_domain_g"
+      ],
+      0,
+      "6f69375a78dd9bc1d220e8a1eb5e4d94"
+    ]
+  ]
+]

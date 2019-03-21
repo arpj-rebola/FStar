@@ -111,17 +111,14 @@ let check_z3hash () : unit =
 
 let ini_params () : list<string> =
   check_z3hash () ;
-  let args : list<string> = ["-smt2"; "-in"; Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))] in
-  let opts : list<string> = Options.z3_cliopt () in
-  let qi : list<string> = if Options.report_qi () then ["smt.qi.profile=true"] else [] in
-  let proof : list<string> = if Options.smt_proof () then ["proof=true"] else [] in
-  args @ opts @ qi @ proof
+  ["-smt2"; "-in"; Util.format1 "smt.random_seed=%s" (string_of_int (Options.z3_seed ()))]@
+      (Options.z3_cliopt ())@
+      (if Options.report_qi () then ["smt.qi.profile=true"] else [])
 
 type label = string
 type unsat_core = option<list<string>>
-type refutation  = option<list<string>>
 type z3status =
-    | UNSAT   of unsat_core * refutation
+    | UNSAT   of unsat_core
     | SAT     of error_labels * option<string>         //error labels
     | UNKNOWN of error_labels * option<string>         //error labels
     | TIMEOUT of error_labels * option<string>         //error labels
@@ -138,7 +135,7 @@ let status_tag : z3status -> string = function
 
 let status_string_and_errors (s : z3status) : string * list<error_label> = match s with
     | KILLED
-    | UNSAT _ -> (status_tag s, [])
+    | UNSAT _ -> status_tag s
     | SAT (errs, msg)
     | UNKNOWN (errs, msg)
     | TIMEOUT (errs, msg) -> BU.format2 "%s%s" (status_tag s) (match msg with None -> "" | Some msg -> " because " ^ msg), errs
@@ -186,7 +183,7 @@ let query_logging : query_log = // : query_log
               | None ->
                 used_file_names := (n, 0)::!used_file_names;
                 n
-              | Some (_, k) ->      // How do we know k is maximal? Code seems to be assumming that.
+              | Some (_, k) ->
                 used_file_names := (n, k+1)::!used_file_names;
                 BU.format2 "%s-%s" n (BU.string_of_int (k+1)) in
           let file_name : string = BU.format1 "queries-%s.smt2" file_name in
@@ -333,12 +330,6 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
     let result : smt_output_section = BU.must result_opt in
     let reason_unknown, lines : option<smt_output_section> * list<string> = find_section "reason-unknown" lines in
     let unsat_core, lines : option<smt_output_section> * list<string> = find_section "unsat-core" lines in
-    let refutation, lines : option<smt_output_section> * list<string> = 
-        if Options.smt_proof () then
-            find_section "proof" lines
-        else
-            None , lines
-    in
     let statistics, lines : option<smt_output_section> * list<string> = find_section "statistics" lines in
     let labels, lines : option<smt_output_section> * list<string> = find_section "labels" lines in
     let remaining : list<string> =
@@ -357,8 +348,7 @@ let smt_output_sections (r:Range.range) (lines:list<string>) : smt_output =
      smt_reason_unknown = reason_unknown;
      smt_unsat_core = unsat_core;
      smt_statistics = statistics;
-     smt_labels = labels;
-     smt_refutation = refutation}
+     smt_labels = labels }
 
 let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (label_messages:error_labels) : z3status * z3statistics =
   let r : Range.range = info.query_info_range in
@@ -375,7 +365,6 @@ let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (
           then None
           else Some (BU.split s " " |> BU.sort_with String.compare)
     in
-    let unsat_proof : refutation = smt_output.smt_refutation in
     let labels =
         match smt_output.smt_labels with
         | None -> []
@@ -421,7 +410,7 @@ let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (
     let status =
       if Options.debug_any() then print_string <| format1 "Z3 says: %s\n" (String.concat "\n" smt_output.smt_result);
       match smt_output.smt_result with
-      | ["unsat"]   -> UNSAT (unsat_core , unsat_proof)
+      | ["unsat"]   -> UNSAT unsat_core
       | ["sat"]     -> SAT     (labels, reason_unknown)
       | ["unknown"] -> UNKNOWN (labels, reason_unknown)
       | ["timeout"] -> TIMEOUT (labels, reason_unknown)
@@ -441,7 +430,7 @@ let doZ3Exe (info:query_info) (decls : list<decl>) (fresh:bool) (input:string) (
   let (status , statistics) : z3status * z3statistics = parse (BU.trim_string stdout) in
   if Options.report_qi () then begin
     match status with
-      | UNSAT (_ , _) -> if fresh then failwith "Option --report_qi is incompatible with multi-core solving" else (!bg_z3_proc).store info decls
+      | UNSAT _ -> if fresh then failwith "Option --report_qi is incompatible with multi-core solving" else (!bg_z3_proc).store info decls
       | _ -> ()
   end ;
   (status , statistics)
@@ -528,7 +517,6 @@ and run_job (j : z3job) : unit =
     j.callback <| j.job ()
 
 let kill () =
-    BU.print "[FINISH]\n" [] ;
     if (Options.n_cores () < 2) then
         ignore <| (!bg_z3_proc).kill ()
 

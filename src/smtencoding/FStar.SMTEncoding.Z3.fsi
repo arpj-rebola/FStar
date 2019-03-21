@@ -27,10 +27,9 @@ module BU = FStar.Util
 
 // type unsat_core = option<list<string>>
 type unsat_core = option<list<string>>
-type refutation = option<list<string>>
 type scope_t = list<list<decl>>
 type z3status =
-    | UNSAT   of unsat_core * refutation
+    | UNSAT   of unsat_core
     | SAT     of error_labels * option<string>         //error labels * z3 reason
     | UNKNOWN of error_labels * option<string>         //error labels * z3 reason
     | TIMEOUT of error_labels * option<string>         //error labels * z3 reason
