@@ -147,7 +147,6 @@ type decl =
   | Pop
   | CheckSat
   | GetUnsatCore
-  | GetProof
   | SetOption  of string * string
   | GetStatistics
   | GetReasonUnknown
@@ -477,7 +476,7 @@ let mkQuantQid (r : Range.range) (check_pats : bool) ((qop , pats , wopt , vars 
     in
     if List.length vars = 0 then body
     else match body.tm with
-         | App(TrueOp, _) -> body     // This in fact works as long as the bound variables do not occur in body. Should that be implemented? Maybe bounded variable lookup takes too long?
+         | App(TrueOp, _) -> body
          | _ -> mk (Quant(qop, all_pats_ok pats, wopt, vars, body, qid)) r
 
 let mkQuant (r : Range.range) (check_pats : bool) ((qop , pats , wopt , vars , body) : qop * list<list<pat>> * option<int> * list<sort> * term) : term =
@@ -513,7 +512,7 @@ let abstr (fvs : list<fv>) (t : term) : term = //fvs is a subset of the free var
         | LblPos(t, r) -> mk (LblPos(aux ix t, r)) t.rng
         | Quant(qop, pats, wopt, vars, body, _) ->
           let n = List.length vars in
-          mkQuant t.rng false (qop, pats |> List.map (List.map (aux (ix + n))), wopt, vars, aux (ix + n) body) // increase indices a la De Bruijn
+          mkQuant t.rng false (qop, pats |> List.map (List.map (aux (ix + n))), wopt, vars, aux (ix + n) body)
         | Let (es, body) ->
           let (ix , es_rev) : int * list<term> = List.fold_left (fun (ix, l) e -> ix+1, (aux ix e)::l) (ix, []) es in
           mkLet (List.rev es_rev, aux ix body) t.rng
@@ -571,9 +570,6 @@ let mkDefineFun ((nm , vars , s , tm , c) : string * list<fv> * sort * term * ca
   DefineFun(nm, List.map fv_sort vars, s, abstr vars tm, c)
 let constr_id_of_sort (sort : sort) : string = format1 "%s_constr_id" (strSort sort)
 
-
-// Axiom:  fresh_token_[token] 
-// [sort]_constr_id ([token]) = [id]
 let fresh_token (rng : Range.range) ((tok_name , sort) : string * sort) (id : int) : decl =
     let a_name = "fresh_token_" ^ tok_name in
     let a = {assumption_name=escape a_name;
@@ -584,8 +580,6 @@ let fresh_token (rng : Range.range) ((tok_name , sort) : string * sort) (id : in
              assumption_fact_ids=[]} in
     Assume a
 
-// Axiom:   constructor_distinct_[token]
-// forall (@x0 : [sort0]) ... (@xn : [sortn]) . [sort]_constr_id ([name] (@x0 ... @xn)) = [id]
 let fresh_constructor (rng : Range.range) ((name , arg_sorts , sort , id) : string * list<sort> * sort * int) : decl =
   let id = string_of_int id in
   let bvars = arg_sorts |> List.mapi (fun i s -> mkFreeV("x_" ^ string_of_int i, s) norng) in
@@ -601,8 +595,6 @@ let fresh_constructor (rng : Range.range) ((name , arg_sorts , sort , id) : stri
   } in
   Assume a
 
-// Axiom:   projection_inverse_[iname_i]
-// forall (@x_0 : [isort_0]) ... (@x_n : [isort_n]) . [iname_i] ([name] (@x_0 ... @x_n)) = @x_i
 let injective_constructor (rng : Range.range) ((name , fields , st) : string * list<constructor_field> * sort) : list<decl> =
     let n_bvars = List.length fields in
     let bvar_name (i : int) : string = "x_" ^ string_of_int i in
@@ -626,10 +618,8 @@ let injective_constructor (rng : Range.range) ((name , fields , st) : string * l
             else [proj_name])
     |> List.flatten
 
-// Function definition:   is-[token]
-// forall (@u : [sort]) . is-[token] (@u) = ([sort]_constr_id ([token](@u)) = [id]) /\_i (...)
 let constructor_to_decl (rng : Range.range) ((name , fields , st , id , injective) : string * list<constructor_field> * sort * int * bool) : list<decl> =
-    let injective : bool = injective || true in    // Is there any reason for this? It essentially makes the injective parameter a noop.
+    let injective : bool = injective || true in
     let field_sorts : list<sort> = fields |> List.map (fun (_, sort, _) -> sort) in
     let cdecl : decl = DeclFun(name, field_sorts, st, Some "Constructor") in
     let cid : decl = fresh_constructor rng (name, field_sorts, st, id) in
@@ -842,7 +832,6 @@ let rec declToSmt' (z3options : string) (print_captions : bool) (decl : decl) : 
     ""
   | CheckSat -> "(echo \"<result>\")\n(check-sat)\n(echo \"</result>\")"
   | GetUnsatCore -> "(echo \"<unsat-core>\")\n(get-unsat-core)\n(echo \"</unsat-core>\")"
-  | GetProof -> "(echo \"<proof>\")\n(get-proof)\n(echo \"</proof>\")"
   | Push -> "(push)"
   | Pop -> "(pop)"
   | SetOption (s, v) -> format2 "(set-option :%s %s)" s v
