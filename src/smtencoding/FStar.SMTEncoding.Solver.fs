@@ -315,30 +315,28 @@ let report_errors (settings : query_settings) : unit =
 let query_info (settings : query_settings) (z3result : z3result) : unit =
     if Options.hint_info() || Options.print_z3_statistics() then begin
         let status_string, errs : string * list<error_label> = Z3.status_string_and_errors z3result.z3result_status in
-        let tag : string = match z3result.z3result_status with
-            | UNSAT _ -> "succeeded"
-            | _ -> "failed {reason-unknown=" ^ status_string ^ "}"
+        let try_get (s : string) (suf : string) : string = match smap_try_find z3result.z3result_statistics s with
+            | None -> "??"
+            | Some r -> r ^ suf
         in
-        let range : string = "(" ^ (Range.string_of_range settings.query_range) ^ at_log_file() ^ ")" in
-        let used_hint_tag : string = if used_hint settings then " (with hint)" else "" in
-        let stats : string =
-            if Options.print_z3_statistics() then
-                let f k v a = a ^ k ^ "=" ^ v ^ " " in
-                let str = smap_fold z3result.z3result_statistics f "statistics={" in
-                    (substring str 0 ((String.length str) - 1)) ^ "}"
-            else ""
+        let fn : string = Range.file_of_range settings.query_range in
+        let rgs : string = settings.query_range |> Range.start_of_range |> Range.string_of_pos in
+        let rge : string = settings.query_range |> Range.end_of_range |> Range.string_of_pos in
+        let header : string = "(" ^ settings.query_name ^ " , " ^ (string_of_int settings.query_index) ^ ") from " ^ fn ^ " (" ^ rgs ^ "-" ^ rge ^ ")" in
+        let fields : list<(string * string)> = [
+            ("hints" , if used_hint settings then "yes" else "no") ;
+            ("total time" , (string_of_int z3result.z3result_time) ^ " ms") ;
+            ("fuel" , string_of_int settings.query_fuel) ;
+            ("ifuel" , string_of_int settings.query_ifuel) ;
+            ("F* rlimit" , string_of_int (settings.query_rlimit / _z3rlimit_magic)) ;
+            ("Z3 rlimit" , string_of_int settings.query_rlimit) ;
+            ("Z3 memory usage" , try_get "memory" "MiB") ;
+            ("Z3 maximum memory" , try_get "max-memory" "MiB") ;
+            ("Z3 time" , try_get "time" "s") ] 
         in
-        BU.print "%s\tQuery-stats (%s, %s)\t%s%s in %s milliseconds with fuel %s and ifuel %s and rlimit %s %s\n"
-             [  range;
-                settings.query_name;
-                BU.string_of_int settings.query_index;
-                tag;
-                used_hint_tag;
-                BU.string_of_int z3result.z3result_time;
-                BU.string_of_int settings.query_fuel;
-                BU.string_of_int settings.query_ifuel;
-                BU.string_of_int settings.query_rlimit;
-                stats ] ;
+        let f (k : string) (v : string) (l : list<(string * string)>) : list<(string * string)> = (k , v) :: l in
+        let stats : list<(string * string)> = smap_fold z3result.z3result_statistics f [] in
+        split_z3_stats header fields stats settings.query_rlimit (smap_try_find z3result.z3result_statistics "rlimit-count") ;
         errs |> List.iter (fun (_, msg, range) ->
             let tag = if used_hint settings then "(Hint-replay failed): " else "" in
             FStar.Errors.log_issue range (FStar.Errors.Warning_HitReplayFailed, (tag ^ msg)))
@@ -412,7 +410,7 @@ let ask_and_report_errors (env : env) (all_labels : error_labels) (prefix : decl
         let rlimit : int =
             Prims.op_Multiply
                 (Options.z3_rlimit_factor ())
-                (Prims.op_Multiply (Options.z3_rlimit ()) 544656)
+                (Prims.op_Multiply (Options.z3_rlimit ()) Z3._z3rlimit_magic)
         in
         let next_hint : option<hint> = get_hint_for qname index in
         let default_settings : query_settings = {

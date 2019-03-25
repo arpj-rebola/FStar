@@ -25,6 +25,8 @@ open FStar.BaseTypes
 open FStar.Util
 module BU = FStar.Util
 
+val _z3rlimit_magic : int
+
 // type unsat_core = option<list<string>>
 type unsat_core = option<list<string>>
 type scope_t = list<list<decl>>

@@ -40,6 +40,8 @@ let _z3hash_expected = "1f29cebd4df6"
 
 let _z3url = "https://github.com/FStarLang/binaries/tree/master/z3-tested"
 
+let _z3rlimit_magic : int = 544656
+
 let parse_z3_version_lines (out : string) : option<string> =
     match splitlines out with
     | x :: _ ->
